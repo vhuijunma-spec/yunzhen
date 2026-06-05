@@ -1,0 +1,9 @@
+[build]
+  builder = "nixpacks"
+  buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+  startCommand = "python index.py"
+
+[service]
+  port = 9000
