@@ -1916,6 +1916,20 @@ def query_task(task_id):
         task = _load_task_from_db(task_id)
         if task:
             _task_store[task_id] = task  # 回填内存
+
+    # 如果本地没有，尝试从URL参数恢复（前端传入remote_id和channel）
+    if not task:
+        remote_id = request.args.get("remote_id", "")
+        channel = request.args.get("channel", "百度云")
+        if remote_id:
+            task = {
+                "model": "", "text": "", "status": "queued",
+                "remote_task_id": remote_id, "channel_name": channel,
+                "query_url_path": "/videos/" if channel == "百度云" else "/v1/video/generations/",
+                "video_url": "", "content": "", "owner_id": 0,
+                "username": "", "baidu_status": "", "baidu_progress": 0,
+                "created_at": time.time(),
+            }
     if not task: return jsonify({"code": 404, "message": "任务不存在"}), 404
 
     # 异步视频任务：实时查一下状态
