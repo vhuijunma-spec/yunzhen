@@ -2,8 +2,8 @@
 AI算力平台 — 后端服务
 首页 + 用户认证 + AI视频生成代理
 """
-import os, sys, json, uuid, time, logging, sqlite3, re
-from datetime import datetime
+import os, sys, json, uuid, time, logging, sqlite3, re, hashlib, hmac, base64
+from datetime import datetime, timedelta
 from functools import wraps
 
 import requests
@@ -1522,6 +1522,73 @@ def api_update_user(uid):
     conn.close()
     logger.info("管理员更新用户 %s: %s", u["username"], ", ".join(changes))
     return jsonify({"code": 0, "message": "用户信息已更新"})
+
+
+# ============================================================
+# 天翼云用量查询（CTAPI 签名代理）
+# ============================================================
+CTYUN_AK = os.environ.get("CTYUN_AK", "d14eefa3e0324d17aa157b8f81b7b31e")
+CTYUN_SK = os.environ.get("CTYUN_SK", "2ef0730bf6da424393e2ec88876fcd02")
+CTYUN_MGMT_HOST = "aigw-global.ctapi.ctyun.cn"
+
+def _ctyun_mgmt_request(method, path, body_dict=None, query_params=None):
+    """调用天翼云管理API (CTAPI签名)"""
+    import uuid as _uuid
+    eop_date = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    request_id = str(_uuid.uuid1())
+    query_str = ""
+    if query_params:
+        sorted_params = sorted(query_params.items(), key=lambda x: x[0])
+        query_str = "&".join("%s=%s" % (k, v) for k, v in sorted_params)
+    body_str = json.dumps(body_dict) if body_dict else ""
+    body_hash = hashlib.sha256(body_str.encode()).hexdigest()
+    header_str = "ctyun-eop-request-id:%s\neop-date:%s\n" % (request_id, eop_date)
+    sign_str = "%s\n%s\n%s" % (header_str, query_str, body_hash)
+    ktime = hmac.new(bytearray(CTYUN_SK.encode()), bytearray(eop_date.encode()), hashlib.sha256).digest()
+    kAk = hmac.new(bytearray(ktime), bytearray(CTYUN_AK.encode()), hashlib.sha256).digest()
+    kdate = hmac.new(bytearray(kAk), bytearray(eop_date[:8].encode()), hashlib.sha256).digest()
+    sig_raw = hmac.new(bytearray(kdate), bytearray(sign_str.encode()), hashlib.sha256).digest()
+    signature = base64.b64encode(sig_raw).decode()
+    headers = {
+        "Content-Type": "application/json;charset=UTF-8",
+        "eop-date": eop_date,
+        "ctyun-eop-request-id": request_id,
+        "Eop-Authorization": "%s Headers=ctyun-eop-request-id;eop-date Signature=%s" % (CTYUN_AK, signature)
+    }
+    full_url = "https://%s%s" % (CTYUN_MGMT_HOST, path)
+    if query_params:
+        full_url += "?" + query_str
+    if method == "GET":
+        resp = requests.get(full_url, headers=headers, timeout=15)
+    else:
+        resp = requests.post(full_url, data=body_str.encode(), headers=headers, timeout=15)
+    return resp.json() if resp.status_code == 200 else {"error": resp.text, "status": resp.status_code}
+
+
+@app.route("/api/admin/ctyun-usage", methods=["GET"])
+@admin_required
+def api_ctyun_usage():
+    """获取天翼云用量数据"""
+    days = int(request.args.get("days", 30))
+    start = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d 00:00:00")
+    end = datetime.utcnow().strftime("%Y-%m-%d 23:59:59")
+    try:
+        data = _ctyun_mgmt_request("POST", "/v1/tokenUsage/query",
+            {"groupBy": 1, "startTime": start, "endTime": end})
+        return jsonify({"code": 0, "usage": data.get("returnObj", []), "days": days})
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
+
+
+@app.route("/api/admin/ctyun-models", methods=["GET"])
+@admin_required
+def api_ctyun_models():
+    """获取天翼云已开通模型"""
+    try:
+        data = _ctyun_mgmt_request("GET", "/v1/model/list")
+        return jsonify({"code": 0, "models": data.get("returnObj", [])})
+    except Exception as e:
+        return jsonify({"code": 500, "message": str(e)}), 500
 
 
 @app.route("/api/admin/videos", methods=["GET"])
