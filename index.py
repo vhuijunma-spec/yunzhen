@@ -820,6 +820,31 @@ def api_channels_all():
     return jsonify({"code": 0, "channels": [dict(c) for c in channels]})
 
 
+@app.route("/api/channels/<int:ch_id>", methods=["PUT"])
+@admin_required
+def api_update_channel(ch_id):
+    """管理员更新渠道配置（API Key 等）"""
+    data = request.get_json(silent=True) or {}
+    conn = _get_db()
+    ch = conn.execute("SELECT * FROM channels WHERE id=?", (ch_id,)).fetchone()
+    if not ch:
+        conn.close()
+        return jsonify({"code": 404, "message": "渠道不存在"}), 404
+
+    new_api_key = data.get("api_key", ch["api_key"])
+    new_base_url = data.get("base_url", ch["base_url"])
+    new_status = data.get("status", ch["status"])
+
+    conn.execute(
+        "UPDATE channels SET api_key=?, base_url=?, status=? WHERE id=?",
+        (new_api_key, new_base_url, new_status, ch_id)
+    )
+    conn.commit()
+    conn.close()
+    logger.info("管理员更新渠道 %s", ch["name"])
+    return jsonify({"code": 0, "message": f"渠道 {ch['name']} 已更新"})
+
+
 @app.route("/api/pricing", methods=["GET"])
 def api_pricing():
     """获取渠道-模型积分定价"""
