@@ -1720,14 +1720,16 @@ def list_models():
 
     conn.close()
 
+    zone_map = {"天翼云": "ZoneA", "百度云": "ZoneB"}
     all_models = []
     for r in rows:
         if r["model_name"] in disabled_set:
             continue
+        ch_name = r["channel_name"]
         all_models.append({
             "modelName": r["model_name"],
             "channel_id": r["channel_id"],
-            "channel_name": r["channel_name"],
+            "channel_name": zone_map.get(ch_name, ch_name),
             "points_per_second": r["points_per_second"],
         })
 
