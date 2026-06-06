@@ -1658,21 +1658,40 @@ def generate():
             who = "主账号" if parent_id else "您"
             return jsonify({"code": 402, "message": f"积分不足！需要 {cost} 积分，{who}当前只有 {current_points} 积分"}), 402
 
-        # 获取渠道信息
+        # 获取渠道信息 — 优先按模型匹配正确的渠道
         ch_row = conn3.execute(
             "SELECT ch.id, ch.name, ch.base_url, ch.api_key FROM channels ch "
             "JOIN user_settings us ON us.channel_id = ch.id WHERE us.user_id=?",
             (uid,)
         ).fetchone() if ch_id else None
         if ch_row:
-            channel_info = dict(ch_row)
-        else:
-            # 回退：从数据库取第一个活跃渠道
-            fb = conn3.execute("SELECT id, name, base_url, api_key FROM channels WHERE status='active' ORDER BY id LIMIT 1").fetchone()
-            if fb:
-                channel_info = dict(fb)
+            # 检查该渠道是否有这个模型
+            model_in_ch = conn3.execute(
+                "SELECT 1 FROM channel_model_pricing WHERE channel_id=? AND model_name=?",
+                (ch_row["id"], model)
+            ).fetchone()
+            if model_in_ch:
+                channel_info = dict(ch_row)
             else:
-                channel_info = {"name": "天翼云", "base_url": CTYUN_BASE_URL, "id": ch_id or 1, "api_key": CTYUN_API_KEY}
+                ch_row = None  # 用户渠道不支持该模型，走回退逻辑
+
+        if not ch_row:
+            # 回退：按模型找正确的渠道
+            model_ch = conn3.execute(
+                "SELECT ch.id, ch.name, ch.base_url, ch.api_key FROM channels ch "
+                "JOIN channel_model_pricing cmp ON cmp.channel_id = ch.id "
+                "WHERE cmp.model_name=? AND ch.status='active' LIMIT 1",
+                (model,)
+            ).fetchone()
+            if model_ch:
+                channel_info = dict(model_ch)
+            else:
+                # 最后回退：取第一个活跃渠道
+                fb = conn3.execute("SELECT id, name, base_url, api_key FROM channels WHERE status='active' ORDER BY id LIMIT 1").fetchone()
+                if fb:
+                    channel_info = dict(fb)
+                else:
+                    channel_info = {"name": "天翼云", "base_url": CTYUN_BASE_URL, "id": ch_id or 1, "api_key": CTYUN_API_KEY}
         conn3.close()
     else:
         conn_fb = _get_db()
