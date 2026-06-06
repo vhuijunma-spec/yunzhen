@@ -1937,6 +1937,11 @@ def query_task(task_id):
                             vurl = content_inner.get("video_url", "")
                         if not vurl:
                             vurl = inner.get("result", {}).get("video_url", "")
+                        # 百度云把URL放在 metadata.url 中
+                        if not vurl:
+                            vurl = inner.get("metadata", {}).get("url", "")
+                            if not vurl:
+                                vurl = td.get("metadata", {}).get("url", "")
                     if not vurl:
                         vurl = inner.get("result_url", "")
                         task["result_url"] = vurl
