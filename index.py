@@ -434,8 +434,8 @@ def _init_db():
 # 天翼云配置（必须在 _init_db 之前定义，因为初始化需要用到）
 # ============================================================
 CTYUN_BASE_URL = os.environ.get("CTYUN_BASE_URL", "https://ai.ctaigw.cn/v1")
-CTYUN_API_KEY  = os.environ.get("CTYUN_API_KEY", "")
-GOGO_API_KEY   = os.environ.get("GOGO_API_KEY", "")
+CTYUN_API_KEY  = os.environ.get("CTYUN_API_KEY") or "sk-5ZC1hM9VHcVuMGxLPZTauZSnHqf"
+GOGO_API_KEY   = os.environ.get("GOGO_API_KEY") or "sk-Clk3nNk0zildPHTGmDfNz3P3s11dEQbwWc9IIrEhgYQuaAZE"
 
 _init_db()
 
