@@ -1568,14 +1568,42 @@ def _ctyun_mgmt_request(method, path, body_dict=None, query_params=None):
 @app.route("/api/admin/ctyun-usage", methods=["GET"])
 @admin_required
 def api_ctyun_usage():
-    """获取天翼云用量数据"""
-    days = int(request.args.get("days", 30))
-    start = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d 00:00:00")
-    end = datetime.utcnow().strftime("%Y-%m-%d 23:59:59")
+    """获取天翼云用量数据，支持自定义时间范围"""
+    start = request.args.get("start", "")
+    end = request.args.get("end", "")
+    if not start or not end:
+        days = int(request.args.get("days", 30))
+        start = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%d 00:00:00")
+        end = datetime.utcnow().strftime("%Y-%m-%d 23:59:59")
     try:
         data = _ctyun_mgmt_request("POST", "/v1/tokenUsage/query",
             {"groupBy": 1, "startTime": start, "endTime": end})
-        return jsonify({"code": 0, "usage": data.get("returnObj", []), "days": days})
+        # 拆解数据：提取调用次数、Token、时长
+        usage_data = data.get("returnObj", [])
+        summary = {"total_requests": 0, "total_tokens": 0, "total_in_tokens": 0, "total_out_tokens": 0, "total_duration_sec": 0}
+        models_detail = {}
+        for obj in usage_data:
+            summary["total_requests"] += obj.get("request", 0)
+            summary["total_tokens"] += obj.get("tokens", 0)
+            summary["total_in_tokens"] += obj.get("inputTokens", 0)
+            summary["total_out_tokens"] += obj.get("outputTokens", 0)
+            summary["total_duration_sec"] += obj.get("totalDuration", 0)
+            for det in obj.get("detail", []):
+                name = det.get("name", "未知")
+                if name not in models_detail:
+                    models_detail[name] = {"requests": 0, "in_tokens": 0, "out_tokens": 0, "duration_sec": 0, "stages": []}
+                models_detail[name]["requests"] += det.get("amountRequest", 0)
+                for s in det.get("stage", []):
+                    models_detail[name]["in_tokens"] += s.get("inputTokens", 0)
+                    models_detail[name]["out_tokens"] += s.get("outputTokens", 0)
+                    models_detail[name]["stages"].append({
+                        "in": s.get("inputTokens", 0), "out": s.get("outputTokens", 0),
+                        "count": s.get("requestCount", 0),
+                        "min_ctx": s.get("minContext", 0), "max_ctx": s.get("maxContext", 0)
+                    })
+                for r in (det.get("resolutionDuration") or []):
+                    models_detail[name]["duration_sec"] += r.get("cnt", 0)
+        return jsonify({"code": 0, "summary": summary, "models": models_detail, "start": start, "end": end})
     except Exception as e:
         return jsonify({"code": 500, "message": str(e)}), 500
 
