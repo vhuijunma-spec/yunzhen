@@ -1372,7 +1372,7 @@ def api_delete_user(uid):
 @app.route("/api/users", methods=["POST"])
 @admin_required
 def api_create_user():
-    """管理员创建用户（可指定角色：admin / sales / user）"""
+    """管理员创建用户（可指定角色：admin / salesperson / user）"""
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     email    = (data.get("email") or "").strip()
@@ -1386,8 +1386,8 @@ def api_create_user():
         return jsonify({"code": 400, "message": "用户名至少 3 个字符"}), 400
     if len(password) < 6:
         return jsonify({"code": 400, "message": "密码至少 6 个字符"}), 400
-    if role not in ("admin", "sales", "user"):
-        return jsonify({"code": 400, "message": "角色必须为 admin、sales 或 user"}), 400
+    if role not in ("admin", "salesperson", "user"):
+        return jsonify({"code": 400, "message": "角色必须为 admin、salesperson 或 user"}), 400
     if not re.match(r'^1[3-9]\d{9}$', phone):
         return jsonify({"code": 400, "message": "手机号格式不正确"}), 400
     if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
@@ -1474,7 +1474,7 @@ def api_update_user(uid):
     if uid == session["user_id"]:
         new_role = u["role"]
 
-    if new_role not in ("admin", "sales", "user"):
+    if new_role not in ("admin", "salesperson", "user"):
         new_role = u["role"]
     if new_status not in ("pending", "approved", "disabled"):
         new_status = u["status"]
