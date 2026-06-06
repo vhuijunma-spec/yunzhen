@@ -942,6 +942,10 @@ def api_balance():
 
     remaining = round(bal["balance"] / rate, 2) if rate > 0 else 0.0
 
+    # Zone 映射
+    zone_map = {"天翼云": "ZoneA", "百度云": "ZoneB"}
+    zone_name = zone_map.get(channel_name, channel_name)
+
     return jsonify({
         "code": 0,
         "balance": bal["balance"],
@@ -952,6 +956,7 @@ def api_balance():
         "rate_per_second": rate,
         "channel_id": ch_id,
         "channel_name": channel_name,
+        "zone": zone_name,
         "total_seconds": total_seconds,
         "channel_seconds": cur_ch_seconds,
         "remaining_seconds": remaining,
@@ -1539,6 +1544,8 @@ def api_site_stats():
     conn = _get_db()
     total = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='admin'").fetchone()[0]
+    # 财务汇总
+    fin = conn.execute("SELECT COALESCE(SUM(total_deposit),0) as td, COALESCE(SUM(total_used),0) as tu, COALESCE(SUM(points),0) as tp FROM user_balance").fetchone()
     conn.close()
     return jsonify({
         "code": 0,
@@ -1547,6 +1554,9 @@ def api_site_stats():
             "admin_users": admin_count,
             "videos_stored": len(_video_store),
             "tasks_processed": len(_task_store),
+            "total_deposit": round(fin["td"], 2),
+            "total_used": round(fin["tu"], 2),
+            "total_points": int(fin["tp"]),
         }
     })
 
