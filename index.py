@@ -306,8 +306,8 @@ def _init_db():
             ("百度云", "https://gogogotoken.com/v1", GOGO_API_KEY, "active",
              datetime.now().isoformat()[:19])
         )
-    elif GOGO_API_KEY and not ch2["api_key"]:
-        conn.execute("UPDATE channels SET api_key=? WHERE id=?", (GOGO_API_KEY, ch2["id"]))
+    elif GOGO_API_KEY:
+        conn.execute("UPDATE channels SET api_key=?, base_url=? WHERE id=?", (GOGO_API_KEY, "https://gogogotoken.com/v1", ch2["id"]))
 
     # 示例销售员（初始化数据 + 创建对应用户账号）
     sp_data = [
@@ -1943,7 +1943,8 @@ def query_task(task_id):
         ch = db.execute("SELECT base_url, api_key FROM channels WHERE name=?", (ch_name,)).fetchone()
         db.close()
         if ch:
-            ch_headers = {"Authorization": f"Bearer {ch['api_key'] or ''}"}
+            api_key = ch['api_key'] or os.environ.get("GOGO_API_KEY") or os.environ.get("CTYUN_API_KEY") or ""
+            ch_headers = {"Authorization": f"Bearer {api_key}"}
             query_url_path = task.get("query_url_path", "/v1/video/generations/")
             query_url = f"{ch['base_url']}{query_url_path}{remote_id}"
             try:
