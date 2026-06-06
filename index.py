@@ -339,11 +339,11 @@ def _init_db():
                 (sp_user_id, datetime.now().isoformat()[:19])
             )
 
-    # --- 默认定价（天翼云渠道） ---
+    # --- 默认定价（天翼云渠道） 1积分/秒 = 1元/秒 ---
     ch_id = conn.execute("SELECT id FROM channels WHERE name='天翼云'").fetchone()["id"]
     default_pricing = [
-        ("GLM-5.0",  10), ("GLM-5.1",    12), ("DeepSeek-V3", 8),
-        ("Kimi-K2.5", 15), ("Kimi-K2.6",  18), ("qwen-plus",   6),
+        ("GLM-5.0",  1), ("GLM-5.1",    1), ("DeepSeek-V3", 1),
+        ("Kimi-K2.5", 1), ("Kimi-K2.6",  1), ("qwen-plus",   1),
     ]
     for mname, pts in default_pricing:
         conn.execute(
@@ -352,14 +352,19 @@ def _init_db():
         )
     # --- 默认定价（天翼云视频模型） ---
     ty_video = [
-        ("seedance-1.0", 20), ("seedance-1.5", 25), ("seedance-2.0", 40),
-        ("qwen-video", 15),
+        ("seedance-1.0", 1), ("seedance-1.5", 1), ("seedance-2.0", 1),
+        ("qwen-video", 1),
     ]
     for mname, pts in ty_video:
         conn.execute(
             "INSERT OR IGNORE INTO channel_model_pricing (channel_id, model_name, points_per_second) VALUES (?, ?, ?)",
             (ch_id, mname, pts)
         )
+    # 统一更新天翼云所有定价为1积分/秒
+    conn.execute(
+        "UPDATE channel_model_pricing SET points_per_second=1 WHERE channel_id=?",
+        (ch_id,)
+    )
     # --- 默认定价（百度云渠道） ---
     ch2_id = conn.execute("SELECT id FROM channels WHERE name='百度云'").fetchone()["id"]
     baidu_pricing = [
