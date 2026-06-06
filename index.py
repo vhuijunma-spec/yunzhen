@@ -268,21 +268,27 @@ def _init_db():
         )
 
     # 默认渠道：天翼云
-    ch = conn.execute("SELECT id FROM channels WHERE name='天翼云'").fetchone()
+    ch = conn.execute("SELECT * FROM channels WHERE name='天翼云'").fetchone()
     if not ch:
         conn.execute(
             "INSERT INTO channels (name, base_url, api_key, status, created_at) VALUES (?, ?, ?, ?, ?)",
             ("天翼云", "https://ai.ctaigw.cn/v1", CTYUN_API_KEY, "active",
              datetime.now().isoformat()[:19])
         )
+    elif CTYUN_API_KEY and not ch["api_key"]:
+        # 已有渠道但没有 Key，从环境变量填充
+        conn.execute("UPDATE channels SET api_key=? WHERE id=?", (CTYUN_API_KEY, ch["id"]))
+
     # 默认渠道：百度云（gogogotoken.com）
-    ch2 = conn.execute("SELECT id FROM channels WHERE name='百度云'").fetchone()
+    ch2 = conn.execute("SELECT * FROM channels WHERE name='百度云'").fetchone()
     if not ch2:
         conn.execute(
             "INSERT INTO channels (name, base_url, api_key, status, created_at) VALUES (?, ?, ?, ?, ?)",
             ("百度云", "https://gogogotoken.com/v1", GOGO_API_KEY, "active",
              datetime.now().isoformat()[:19])
         )
+    elif GOGO_API_KEY and not ch2["api_key"]:
+        conn.execute("UPDATE channels SET api_key=? WHERE id=?", (GOGO_API_KEY, ch2["id"]))
 
     # 示例销售员（初始化数据 + 创建对应用户账号）
     sp_data = [
