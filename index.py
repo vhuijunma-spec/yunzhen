@@ -245,6 +245,25 @@ def _init_db():
             FOREIGN KEY (owner_id) REFERENCES users(id)
         )
     """)
+    # 任务持久化表
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS tasks (
+            id              TEXT    PRIMARY KEY,
+            remote_task_id  TEXT    DEFAULT '',
+            model           TEXT    DEFAULT '',
+            prompt_text     TEXT    DEFAULT '',
+            status          TEXT    DEFAULT 'queued',
+            video_url       TEXT    DEFAULT '',
+            channel_name    TEXT    DEFAULT '',
+            query_url_path  TEXT    DEFAULT '',
+            owner_id        INTEGER DEFAULT 0,
+            username        TEXT    DEFAULT '',
+            baidu_status    TEXT    DEFAULT '',
+            baidu_progress  INTEGER DEFAULT 0,
+            created_at      REAL    NOT NULL,
+            FOREIGN KEY (owner_id) REFERENCES users(id)
+        )
+    """)
 
     # --- 初始化默认数据 ---
 
@@ -1762,7 +1781,7 @@ def generate():
             elapsed = round(time.time() - t1, 2)
 
             task_id = str(uuid.uuid4())
-            _task_store[task_id] = {
+            task_data = {
                 "model": model, "text": prompt_text[:200],
                 "status": "queued",
                 "remote_task_id": remote_task_id,
@@ -1774,6 +1793,9 @@ def generate():
                 "username": session.get("username", ""),
                 "created_at": time.time(),
             }
+            _task_store[task_id] = task_data
+            # 持久化到 SQLite
+            _save_task_to_db(task_id, task_data)
 
             if uid:
                 conn2 = _get_db()
@@ -1871,13 +1893,15 @@ def generate():
         logger.info("用量记录: user=%s channel=%s elapsed=%.2fs cost=%spts", uid, channel_info["id"], elapsed, cost)
 
     task_id = str(uuid.uuid4())
-    _task_store[task_id] = {
+    task_data = {
         "model": model, "text": prompt_text[:200],
         "status": "completed" if video_url else "processing",
         "video_url": video_url, "content": content, "owner_id": uid,
         "username": session.get("username", ""),
         "created_at": time.time(),
     }
+    _task_store[task_id] = task_data
+    _save_task_to_db(task_id, task_data)
     return jsonify({
         "code": 0, "task_id": task_id, "status": _task_store[task_id]["status"],
         "video_url": video_url, "content": content,
@@ -1904,6 +1928,11 @@ def _extract_video_url(result):
 @app.route("/api/task/<task_id>", methods=["GET"])
 def query_task(task_id):
     task = _task_store.get(task_id)
+    # 内存中没有就从数据库恢复
+    if not task:
+        task = _load_task_from_db(task_id)
+        if task:
+            _task_store[task_id] = task  # 回填内存
     if not task: return jsonify({"code": 404, "message": "任务不存在"}), 404
 
     # 异步视频任务：实时查一下状态
@@ -1967,6 +1996,7 @@ def query_task(task_id):
 
                     task["status"] = "completed"
                     task["video_url"] = local_url
+                    _save_task_to_db(task_id, task)  # 持久化
                     # 自动加入视频库
                     vid = str(uuid.uuid4())[:8]
                     video_entry = {
@@ -1979,6 +2009,7 @@ def query_task(task_id):
                     _save_video_to_db(video_entry)
                 elif failed:
                     task["status"] = "failed"
+                    _save_task_to_db(task_id, task)
             except:
                 pass
 
@@ -2101,6 +2132,54 @@ def serve_static(filename):
 
 def handler(environ, start_response):
     return app(environ, start_response)
+
+
+# 任务持久化
+def _save_task_to_db(task_id, task_data):
+    try:
+        conn = _get_db()
+        conn.execute("""
+            INSERT OR REPLACE INTO tasks (id, remote_task_id, model, prompt_text, status, video_url,
+                channel_name, query_url_path, owner_id, username, baidu_status, baidu_progress, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            task_id,
+            task_data.get("remote_task_id", ""),
+            task_data.get("model", ""),
+            task_data.get("text", "")[:200],
+            task_data.get("status", "queued"),
+            task_data.get("video_url", ""),
+            task_data.get("channel_name", ""),
+            task_data.get("query_url_path", ""),
+            task_data.get("owner_id", 0),
+            task_data.get("username", ""),
+            task_data.get("baidu_status", ""),
+            task_data.get("baidu_progress", 0),
+            task_data.get("created_at", time.time()),
+        ))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.warning("保存任务到DB失败: %s", e)
+
+
+def _load_task_from_db(task_id):
+    try:
+        conn = _get_db()
+        row = conn.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
+        conn.close()
+        if row:
+            return {
+                "model": row["model"], "text": row["prompt_text"],
+                "status": row["status"], "remote_task_id": row["remote_task_id"],
+                "channel_name": row["channel_name"], "query_url_path": row["query_url_path"],
+                "video_url": row["video_url"], "content": "", "owner_id": row["owner_id"],
+                "username": row["username"], "baidu_status": row["baidu_status"],
+                "baidu_progress": row["baidu_progress"], "created_at": row["created_at"],
+            }
+    except:
+        pass
+    return None
 
 
 # 将视频保存到数据库
