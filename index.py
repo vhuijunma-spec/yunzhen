@@ -363,21 +363,27 @@ def _init_db():
     # --- 默认定价（百度云渠道） ---
     ch2_id = conn.execute("SELECT id FROM channels WHERE name='百度云'").fetchone()["id"]
     baidu_pricing = [
-        ("doubao-seedance-1-5-pro_480p",   15),
-        ("doubao-seedance-1-5-pro_720p",   25),
-        ("doubao-seedance-1-5-pro_1080p",  40),
-        ("doubao-seedance-2-0-480p",       20),
-        ("doubao-seedance-2-0-720p",       35),
-        ("doubao-seedance-2-0-1080p",      50),
-        ("doubao-seedance-2-0-fast-480p",  18),
-        ("doubao-seedance-2-0-fast-720p",  30),
-        ("doubao-seedream-4-5-251128",     8),
+        # 百度云统一定价：1积分/秒 = 1元/秒
+        ("doubao-seedance-1-5-pro_480p",   1),
+        ("doubao-seedance-1-5-pro_720p",   1),
+        ("doubao-seedance-1-5-pro_1080p",  1),
+        ("doubao-seedance-2-0-480p",       1),
+        ("doubao-seedance-2-0-720p",       1),
+        ("doubao-seedance-2-0-1080p",      1),
+        ("doubao-seedance-2-0-fast-480p",  1),
+        ("doubao-seedance-2-0-fast-720p",  1),
+        ("doubao-seedream-4-5-251128",     1),
     ]
     for mname, pts in baidu_pricing:
         conn.execute(
             "INSERT OR IGNORE INTO channel_model_pricing (channel_id, model_name, points_per_second) VALUES (?, ?, ?)",
             (ch2_id, mname, pts)
         )
+    # 更新已有百度云定价为1积分/秒
+    conn.execute(
+        "UPDATE channel_model_pricing SET points_per_second=1 WHERE channel_id=?",
+        (ch2_id,)
+    )
 
     # --- 固定测试客户 xiaoming ---
     xm = conn.execute("SELECT id FROM users WHERE username='xiaoming'").fetchone()
