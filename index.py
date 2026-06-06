@@ -1948,7 +1948,7 @@ def query_task(task_id):
             query_url_path = task.get("query_url_path", "/v1/video/generations/")
             query_url = f"{ch['base_url']}{query_url_path}{remote_id}"
             try:
-                qr = requests.get(query_url, headers=ch_headers, timeout=15)
+                qr = requests.get(query_url, headers=ch_headers, timeout=8)
                 td = qr.json()
                 inner = td.get("data", td)
                 remote_status = inner.get("status", td.get("status", ""))
@@ -2011,8 +2011,8 @@ def query_task(task_id):
                 elif failed:
                     task["status"] = "failed"
                     _save_task_to_db(task_id, task)
-            except:
-                pass
+            except Exception as poll_err:
+                logger.warning("轮询百度云失败: %s", poll_err)
 
     return jsonify({"code": 0, "task_id": task_id, "status": task["status"],
                     "video_url": task.get("video_url", ""), "content": task.get("content", ""),
