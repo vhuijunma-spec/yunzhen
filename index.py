@@ -1939,24 +1939,14 @@ def list_models():
             ).fetchall()
             disabled_set = set(r["model_name"] for r in rows)
 
-    # 从定价表加载，保证和销售员端看到的名字完全一致
-    if user_ch_id:
-        rows = conn.execute("""
-            SELECT cmp.model_name, cmp.points_per_second, ch.name AS channel_name, ch.id AS channel_id
-            FROM channel_model_pricing cmp
-            JOIN channels ch ON ch.id = cmp.channel_id
-            WHERE cmp.channel_id = ?
-            ORDER BY cmp.points_per_second
-        """, (user_ch_id,)).fetchall()
-    else:
-        # 未分配渠道：展示所有渠道的定价模型
-        rows = conn.execute("""
-            SELECT cmp.model_name, cmp.points_per_second, ch.name AS channel_name, ch.id AS channel_id
-            FROM channel_model_pricing cmp
-            JOIN channels ch ON ch.id = cmp.channel_id
-            WHERE ch.status = 'active'
-            ORDER BY cmp.points_per_second
-        """).fetchall()
+    # 从定价表加载：始终展示所有活跃渠道的允许模型
+    rows = conn.execute("""
+        SELECT cmp.model_name, cmp.points_per_second, ch.name AS channel_name, ch.id AS channel_id
+        FROM channel_model_pricing cmp
+        JOIN channels ch ON ch.id = cmp.channel_id
+        WHERE ch.status = 'active'
+        ORDER BY cmp.points_per_second
+    """).fetchall()
 
     conn.close()
 
