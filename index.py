@@ -2017,6 +2017,10 @@ def generate():
     duration = data.get("duration", 0)
     size     = data.get("size", "16:9")
     image_url = (data.get("image_url") or "").strip()  # 图生视频
+    if image_url and image_url.startswith("/"):
+        # 相对URL补全为绝对URL
+        host_url = request.host_url.rstrip("/")
+        image_url = host_url + image_url
 
     if not messages and text:
         messages = [{"role": "user", "content": text}]
@@ -2132,15 +2136,22 @@ def generate():
                 video_url_path = "/video/generations"
                 query_url_path = "/video/generations/"
             else:
-                # 百度云: POST /videos (base_url 已含 /v1)
+                # 百度云 GoToken: 使用 metadata 传参
                 video_params = {
                     "model": model, "prompt": prompt_text,
-                    "seconds": str(duration), "size": size,
+                    "metadata": {
+                        "resolution": data.get("quality", "720p"),
+                        "ratio": size,
+                        "duration": duration,
+                        "watermark": False,
+                        "generate_audio": True,
+                    }
                 }
+                # 图生视频：通过 images 数组传参考图
                 if image_url:
-                    video_params["image_url"] = image_url
-                video_url_path = "/videos"
-                query_url_path = "/videos/"
+                    video_params["images"] = [image_url]
+                video_url_path = "/v1/video/generations"
+                query_url_path = "/v1/video/generations/"
 
             logger.info("%s提交视频: %s", ch_name, video_params)
             resp = requests.post(
@@ -2351,20 +2362,25 @@ def query_task(task_id):
                 done = remote_status_lower in ("completed", "success", "done", "succeeded")
                 failed = remote_status_lower in ("failed", "error", "failure")
                 if done:
-                    vurl = inner.get("video_url", td.get("video_url", ""))
-                    if not vurl and isinstance(inner, dict):
-                        content_inner = inner.get("content", {})
-                        if isinstance(content_inner, dict):
-                            vurl = content_inner.get("video_url", "")
+                    # 按优先级提取视频URL: output.video_url > metadata.url > result_url > video_url
+                    vurl = ""
+                    for field_path in [
+                        ("output", "video_url"),              # GoToken标准格式
+                        ("metadata", "url"),                    # 旧格式
+                        ("result", "video_url"),
+                        ("result", "url"),
+                    ]:
                         if not vurl:
-                            vurl = inner.get("result", {}).get("video_url", "")
-                        # 百度云把URL放在 metadata.url 中
-                        if not vurl:
-                            vurl = inner.get("metadata", {}).get("url", "")
-                            if not vurl:
-                                vurl = td.get("metadata", {}).get("url", "")
+                            for src in [inner, td]:
+                                f0 = src.get(field_path[0], {})
+                                if isinstance(f0, dict):
+                                    vurl = f0.get(field_path[1], "")
+                                if vurl: break
                     if not vurl:
-                        vurl = inner.get("result_url", "")
+                        vurl = inner.get("video_url", td.get("video_url", ""))
+                    if not vurl:
+                        vurl = inner.get("result_url", td.get("result_url", ""))
+                    if vurl:
                         task["result_url"] = vurl
 
                     # 下载到本地，避免CDN链接过期
