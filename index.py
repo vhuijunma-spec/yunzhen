@@ -356,7 +356,6 @@ def _init_db():
         conn.execute("ALTER TABLE videos ADD COLUMN duration INTEGER DEFAULT 0")
     except:
         pass
-    """)
     # 任务持久化表
     conn.execute("""
         CREATE TABLE IF NOT EXISTS tasks (
