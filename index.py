@@ -2358,13 +2358,13 @@ def query_task(task_id):
                 done = remote_status_lower in ("completed", "success", "done", "succeeded")
                 failed = remote_status_lower in ("failed", "error", "failure")
                 if done:
-                    # 按优先级提取视频URL: output.video_url > metadata.url > result_url > video_url
+                    # 按优先级提取视频URL
                     vurl = ""
                     for field_path in [
-                        ("output", "video_url"),              # GoToken标准格式
+                        ("data", "result_url"),                 # GoToken新格式
+                        ("output", "video_url"),                # GoToken标准格式
                         ("metadata", "url"),                    # 旧格式
                         ("result", "video_url"),
-                        ("result", "url"),
                     ]:
                         if not vurl:
                             for src in [inner, td]:
@@ -2379,11 +2379,11 @@ def query_task(task_id):
                     if vurl:
                         task["result_url"] = vurl
 
-                    # 下载到本地，避免CDN链接过期
+                    # 优先用GoToken CDN地址（24h有效），不下载到Render避免部署丢失
                     local_url = vurl
-                    if vurl:
+                    if vurl and not vurl.startswith("/api/"):
                         try:
-                            r = requests.get(vurl, timeout=60, stream=True,
+                            r = requests.get(vurl, timeout=30, stream=True,
                                 headers={"Referer": "https://gogogotoken.com/",
                                          "User-Agent": "Mozilla/5.0"})
                             if r.status_code == 200:
@@ -2395,8 +2395,10 @@ def query_task(task_id):
                                         if chunk: f.write(chunk)
                                 local_url = f"/api/video-file/{local_fname}"
                                 logger.info("视频已下载到本地: %s", local_fname)
+                            else:
+                                logger.info("使用远程CDN地址: %s...", vurl[:60])
                         except Exception as de:
-                            logger.warning("视频下载失败,使用远程URL: %s", de)
+                            logger.warning("下载失败使用CDN: %s", de)
 
                     task["status"] = "completed"
                     task["video_url"] = local_url
