@@ -24,9 +24,12 @@ app.secret_key = os.environ.get("SECRET_KEY", uuid.uuid4().hex)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+_BASE = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_DIR = os.path.join(_BASE, "frontend")
 if not os.path.isdir(FRONTEND_DIR):
-    FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "video-website")
+    FRONTEND_DIR = os.path.join(_BASE, "..", "video-website")
+if not os.path.isdir(FRONTEND_DIR):
+    FRONTEND_DIR = _BASE  # 最后回退：同目录
 
 # CORS + Request ID 中间件
 @app.after_request
@@ -1942,6 +1945,8 @@ def api_site_stats():
 def ping():
     return jsonify({"ok": True, "time": datetime.now().isoformat(),
                     "db": "postgresql" if USE_PG else "sqlite",
+                    "frontend": FRONTEND_DIR,
+                    "files": os.listdir(FRONTEND_DIR)[:10] if os.path.isdir(FRONTEND_DIR) else [],
                     "ctyun_key_set": bool(os.environ.get("CTYUN_API_KEY")),
                     "gogo_key_set": bool(os.environ.get("GOGO_API_KEY"))})
 
