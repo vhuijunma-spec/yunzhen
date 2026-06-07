@@ -2133,8 +2133,8 @@ def generate():
                         content_list.append({"type": "image_url", "image_url": {"url": image_url}, "role": "first_frame"})
                     content_list.append({"type": "video_url", "video_url": {"url": ref_video_url}})
                     meta["content"] = content_list
-                video_url_path = "/v1/video/generations"
-                query_url_path = "/v1/video/generations/"
+                video_url_path = "/video/generations"
+                query_url_path = "/video/generations/"
 
             logger.info("%s提交视频: %s", ch_name, video_params)
             resp = requests.post(
