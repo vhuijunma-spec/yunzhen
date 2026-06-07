@@ -1017,6 +1017,23 @@ def api_update_pricing(ch_id, model_name):
     return jsonify({"code": 0, "message": "定价已更新"})
 
 
+@app.route("/api/showcase", methods=["GET"])
+def api_showcase():
+    """公开视频广场 — 无需登录"""
+    videos = [v for v in _video_store if v.get("url", "").startswith("/api/video-file/")]
+    result = []
+    for v in videos[-20:]:  # 最近20个
+        result.append({
+            "id": v.get("id", ""),
+            "name": v.get("name", "AI视频")[:30],
+            "url": v.get("url", ""),
+            "created_at": v.get("created_at", ""),
+            "owner_name": "用户" + str(v.get("owner_id", "")),
+        })
+    result.reverse()
+    return jsonify({"code": 0, "videos": result})
+
+
 @app.route("/api/config/exchange-rate", methods=["GET"])
 @admin_required
 def api_get_exchange():
@@ -1189,6 +1206,10 @@ def dashboard_page():
 @app.route("/admin")
 def admin_page():
     return _serve_html("admin.html")
+
+@app.route("/showcase")
+def showcase_page():
+    return _serve_html("showcase.html")
 
 @app.route("/sales")
 def sales_page():
