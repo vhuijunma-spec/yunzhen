@@ -490,12 +490,6 @@ def _init_db():
         )
     # 更新已有百度云定价为1积分/秒，删除旧的分辨率细分模型
     conn.execute("UPDATE channel_model_pricing SET points_per_second=1 WHERE channel_id=?", (ch2_id,))
-    # 删除旧的分辨率细分模型（避免 PG % 占位符冲突，用精确匹配）
-    old_models = ["doubao-seedance-1-5-pro_480p","doubao-seedance-1-5-pro_720p","doubao-seedance-1-5-pro_1080p",
-                  "doubao-seedance-2-0-480p","doubao-seedance-2-0-720p","doubao-seedance-2-0-1080p",
-                  "doubao-seedance-2-0-fast-480p","doubao-seedance-2-0-fast-720p","doubao-seedream-4-5-251128"]
-    for old_m in old_models:
-        conn.execute("DELETE FROM channel_model_pricing WHERE channel_id=? AND model_name=?", (ch2_id, old_m))
 
     # --- 固定测试客户 xiaoming ---
     xm = conn.execute("SELECT id FROM users WHERE username='xiaoming'").fetchone()
@@ -1992,13 +1986,19 @@ def list_models():
     conn.close()
 
     zone_map = {"天翼云": "ZoneA", "百度云": "ZoneB"}
+    # 百度云只保留2个基础模型，过滤掉分辨率后缀的旧模型
+    BAIDU_BASE_MODELS = {"doubao-seedance-2-0", "doubao-seedance-2-0-fast"}
     all_models = []
     for r in rows:
         if r["model_name"] in disabled_set:
             continue
         ch_name = r["channel_name"]
+        mname = r["model_name"]
+        # 百度云渠道：只显示基础模型
+        if ch_name == "百度云" and mname not in BAIDU_BASE_MODELS:
+            continue
         all_models.append({
-            "modelName": r["model_name"],
+            "modelName": mname,
             "channel_id": r["channel_id"],
             "channel_name": zone_map.get(ch_name, ch_name),
             "points_per_second": r["points_per_second"],
