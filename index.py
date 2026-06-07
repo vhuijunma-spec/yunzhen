@@ -2140,7 +2140,7 @@ def generate():
                     content_list = []
                     if image_url:
                         content_list.append({"type": "image_url", "image_url": {"url": image_url}, "role": "first_frame"})
-                    content_list.append({"type": "video_url", "video_url": {"url": ref_video_url}})
+                    content_list.append({"type": "video_url", "video_url": {"url": ref_video_url}, "role": "reference_video"})
                     meta["content"] = content_list
                 video_url_path = "/video/generations"
                 query_url_path = "/video/generations/"
