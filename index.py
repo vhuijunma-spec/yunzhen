@@ -51,8 +51,8 @@ def _assign_request_id():
 # 数据库（支持 SQLite 本地 + PostgreSQL 生产）
 # ============================================================
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
-USE_PG = bool(DATABASE_URL)
+DATABASE_URL = os.environ.get("DATABASE_URL") or "postgresql://yunzhen_db_user:9RjVZ0xXTlLdQSrjBQQr9IR2VtOXfrdC@dpg-d8ihmigjo6nc73da0vfg-a.oregon-postgres.render.com/yunzhen_db"
+USE_PG = True
 
 def _get_db():
     """获取数据库连接（SQLite 或 PostgreSQL）"""
