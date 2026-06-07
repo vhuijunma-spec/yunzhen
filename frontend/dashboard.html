@@ -688,7 +688,9 @@ function showVideo(videoUrl, prompt, model) {
   document.getElementById('vpa-title').textContent = prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '');
   document.getElementById('vpa-info').textContent = '模型: ' + model;
   var dl = document.getElementById('vpa-download');
-  dl.href = videoUrl; dl.download = 'ai_video_' + Date.now() + '.mp4'; dl.style.display = 'inline-block';
+  if(videoUrl.indexOf('http')===0) dl.href = '/api/download-video?url='+encodeURIComponent(videoUrl);
+  else dl.href = videoUrl;
+  dl.download = 'ai_video_' + Date.now() + '.mp4'; dl.style.display = 'inline-block';
 
   // 滚动到视频
   area.scrollIntoView({ behavior: 'smooth' });

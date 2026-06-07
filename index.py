@@ -2379,26 +2379,10 @@ def query_task(task_id):
                     if vurl:
                         task["result_url"] = vurl
 
-                    # 优先用GoToken CDN地址（24h有效），不下载到Render避免部署丢失
+                    # 直接用GoToken CDN地址（24h有效），不下载到Render
+                    # 用户可从前端直接下载到本地计算机
                     local_url = vurl
-                    if vurl and not vurl.startswith("/api/"):
-                        try:
-                            r = requests.get(vurl, timeout=30, stream=True,
-                                headers={"Referer": "https://gogogotoken.com/",
-                                         "User-Agent": "Mozilla/5.0"})
-                            if r.status_code == 200:
-                                local_fname = f"gen_{remote_id}.mp4"
-                                local_path = os.path.join(os.path.dirname(__file__), "uploads", local_fname)
-                                os.makedirs(os.path.dirname(local_path), exist_ok=True)
-                                with open(local_path, "wb") as f:
-                                    for chunk in r.iter_content(8192):
-                                        if chunk: f.write(chunk)
-                                local_url = f"/api/video-file/{local_fname}"
-                                logger.info("视频已下载到本地: %s", local_fname)
-                            else:
-                                logger.info("使用远程CDN地址: %s...", vurl[:60])
-                        except Exception as de:
-                            logger.warning("下载失败使用CDN: %s", de)
+                    logger.info("视频CDN地址: %s...", vurl[:60] if vurl else "无")
 
                     task["status"] = "completed"
                     task["video_url"] = local_url
@@ -2518,23 +2502,25 @@ def serve_video(fname):
     return send_from_directory(os.path.join(os.path.dirname(__file__), "uploads"), fname)
 
 
-@app.route("/api/proxy-video", methods=["GET"])
-def proxy_video():
-    """后端代理获取远程视频（绕过CDN防盗链/CORS）"""
+@app.route("/api/download-video", methods=["GET"])
+def download_video():
+    """代理下载远程视频到本地计算机（流式转发，不存Render磁盘）"""
     from flask import Response
     target_url = request.args.get("url", "").strip()
     if not target_url:
         return jsonify({"code": 400, "message": "缺少url参数"}), 400
     try:
-        r = requests.get(target_url, headers={"Referer": "https://gogogotoken.com/"}, timeout=120, stream=True)
+        r = requests.get(target_url, headers={"Referer": "https://gogogotoken.com/"}, timeout=60, stream=True)
         r.raise_for_status()
         def generate():
             for chunk in r.iter_content(chunk_size=8192):
                 if chunk:
                     yield chunk
-        return Response(generate(), content_type=r.headers.get("Content-Type", "video/mp4"))
+        resp = Response(generate(), content_type="video/mp4")
+        resp.headers["Content-Disposition"] = "attachment; filename=ai_video.mp4"
+        return resp
     except requests.exceptions.RequestException as e:
-        return jsonify({"code": 502, "message": f"视频获取失败: {e}"}), 502
+        return jsonify({"code": 502, "message": f"下载失败: {e}"}), 502
 
 
 @app.route("/api/videos/save-url", methods=["POST"])
