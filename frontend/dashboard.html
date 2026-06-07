@@ -127,7 +127,6 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
     <button class="active" data-panel="generate">✨ AI 生成</button>
     <button data-panel="videos">🎞️ 视频库</button>
     <button data-panel="upload">📤 上传视频</button>
-    <button data-panel="script">📜 脚本创作</button>
     <button data-panel="sub-accounts">👥 子账号管理</button>
     <button data-panel="payment">💳 付款</button>
     <a href="/admin" id="nav-admin" style="display:none;margin-top:auto;align-items:center;gap:10px;padding:12px 14px;border-radius:8px;cursor:pointer;border:none;background:rgba(245,158,11,0.1);color:var(--accent);font-size:14px;width:100%;text-align:left;text-decoration:none;transition:.2s;" onmouseover="this.style.background='rgba(245,158,11,0.2)';" onmouseout="this.style.background='rgba(245,158,11,0.1)';">⚙ 系统管理</a>
@@ -275,31 +274,6 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
       </div>
     </div>
 
-    <!-- ============ 脚本创作 ============ -->
-    <div class="panel" id="panel-script">
-      <div class="panel-title">📜 脚本创作 — AI 分镜生成</div>
-      <div class="input-box">
-        <div style="margin-bottom:16px;">
-          <div class="param-group" style="margin-bottom:10px;"><label>📝 故事创意</label></div>
-          <textarea id="script-idea" placeholder="描述你的故事创意，AI将自动生成分镜脚本...&#10;&#10;例如：一个孤独的宇航员在火星上发现了一朵花，他决定守护它" style="min-height:100px;width:100%;"></textarea>
-        </div>
-        <div class="input-row">
-          <div class="param-group"><label>分镜数量</label><input type="number" id="script-count" value="4" min="1" max="12" step="1" style="width:70px;"></div>
-          <button class="btn btn-accent" id="btn-script" onclick="generateScript()">🤖 AI 生成分镜</button>
-        </div>
-      </div>
-
-      <!-- 分镜结果 -->
-      <div id="script-result" style="display:none;margin-top:20px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-          <h3 style="font-size:16px;">🎬 分镜脚本</h3>
-          <button class="btn btn-accent btn-sm" onclick="batchGenerate()">🚀 一键生成全部视频</button>
-        </div>
-        <div id="script-scenes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;"></div>
-        <div id="batch-status" style="margin-top:14px;"></div>
-      </div>
-    </div>
-
     <!-- ============ 付款 ============ -->
     <div class="panel" id="panel-payment">
       <div class="panel-title">💳 付款充值</div>
@@ -373,7 +347,6 @@ document.querySelectorAll('.sidebar-nav button').forEach(btn=>{
     if(this.dataset.panel==='upload') loadUploadVideos();
     if(this.dataset.panel==='sub-accounts') loadSubAccounts();
     if(this.dataset.panel==='payment') loadPaymentBalance();
-    if(this.dataset.panel==='script') {};
   });
 });
 
@@ -718,51 +691,6 @@ function showSubDetail(subId,subName){
 }
 
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-// 脚本创作
-var scriptScenes=[];
-async function generateScript(){
-  var idea=document.getElementById('script-idea').value.trim();
-  if(!idea) return toast('请输入故事创意','error');
-  var btn=document.getElementById('btn-script'); btn.disabled=true; btn.textContent='⏳ AI生成中...';
-  try {
-    var r=await fetch('/api/script/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({idea:idea,scene_count:parseInt(document.getElementById('script-count').value)||4})});
-    var d=await r.json();
-    if(d.code===0){ scriptScenes=d.scenes||[]; renderScenes(); document.getElementById('script-result').style.display='block'; toast('分镜生成成功！','success'); }
-    else toast(d.message||'生成失败','error');
-  } catch(e){ toast('生成失败: '+e.message,'error'); }
-  btn.disabled=false; btn.textContent='🤖 AI 生成分镜';
-}
-function renderScenes(){
-  var grid=document.getElementById('script-scenes');
-  grid.innerHTML=scriptScenes.map(function(s,i){
-    return '<div class="setting-section" style="position:relative;"><div style="position:absolute;top:8px;right:12px;font-size:24px;font-weight:900;color:var(--accent);opacity:0.3;">#'+(s.scene||i+1)+'</div><div style="font-size:14px;font-weight:600;margin-bottom:8px;">🎬 镜头'+(s.scene||(i+1))+' <span style="font-size:11px;color:var(--accent2);">'+(s.camera||'')+'</span></div><div style="font-size:12px;color:var(--text2);margin-bottom:8px;">'+esc(s.description||'')+'</div><div class="param-group" style="margin-bottom:8px;"><label>提示词（可编辑）</label><textarea style="background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:8px;font-size:12px;width:100%;min-height:50px;resize:vertical;" onchange="scriptScenes['+i+'].prompt=this.value">'+esc(s.prompt||'')+'</textarea></div><div class="input-row" style="margin-top:4px;"><div class="param-group"><label>时长(秒)</label><input type="number" value="'+(s.duration||5)+'" min="5" max="15" style="width:60px;" onchange="scriptScenes['+i+'].duration=parseInt(this.value)"></div><button class="btn btn-accent btn-sm" onclick="generateOneScene('+i+')">🎬 生成此镜头</button></div></div>';
-  }).join('');
-}
-async function generateOneScene(idx){
-  var s=scriptScenes[idx]; if(!s||!s.prompt) return toast('请输入提示词','error');
-  toast('正在提交镜头'+(s.scene||(idx+1))+'...','success');
-  var genBody={model:currentModel||selectedModel||'doubao-seedance-2-0-480p',text:s.prompt,duration:s.duration||5,size:'16:9'};
-  try {
-    var r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(genBody)});
-    var d=await r.json();
-    if(d.code===0){ toast('镜头'+(s.scene||(idx+1))+' 已提交！','success'); loadBalance(); }
-    else toast(d.message||'提交失败','error');
-  } catch(e){ toast('失败: '+e.message,'error'); }
-}
-async function batchGenerate(){
-  if(scriptScenes.length===0) return toast('没有分镜','error');
-  if(!confirm('确定要批量生成 '+scriptScenes.length+' 个视频吗？将消耗积分。')) return;
-  var statusDiv=document.getElementById('batch-status');
-  statusDiv.innerHTML='<div style="padding:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:13px;">提交中 0/'+scriptScenes.length+'...</div>';
-  try {
-    var r=await fetch('/api/generate/batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scenes:scriptScenes,model:currentModel||selectedModel||'doubao-seedance-2-0-480p',size:'16:9'})});
-    var d=await r.json(); var ok=0,fail=0;
-    (d.results||[]).forEach(function(res){ if(res.status==='queued') ok++; else fail++; });
-    statusDiv.innerHTML='<div style="padding:10px;background:var(--card);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--green);">✅ 成功'+ok+'个'+(fail>0?', ❌ 失败'+fail+'个':'')+'</div>';
-    if(ok>0){ toast('已提交'+ok+'个视频任务，请到视频库查看','success'); loadBalance(); }
-  } catch(e){ statusDiv.innerHTML='<div style="padding:10px;background:var(--card);border:1px solid var(--red);border-radius:8px;font-size:13px;">失败: '+e.message+'</div>'; }
-}
-
 function toast(msg,type){ const el=document.createElement('div'); el.className='toast '+(type||''); el.textContent=msg; document.getElementById('toast-container').appendChild(el); setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';},3000); setTimeout(()=>el.remove(),3500); }
 </script>
 </body>
