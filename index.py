@@ -1991,8 +1991,8 @@ def generate():
         return jsonify({"code": 400, "message": "请选择模型"}), 400
     if not messages and not image_url:
         return jsonify({"code": 400, "message": "请输入内容或上传图片"}), 400
-    if not duration or int(duration) < 5:
-        return jsonify({"code": 400, "message": "请选择视频时长（最少5秒）"}), 400
+    if not duration or int(duration) < 4:
+        return jsonify({"code": 400, "message": "请选择视频时长（最少4秒）"}), 400
 
     duration = int(duration)
     uid = session.get("user_id")

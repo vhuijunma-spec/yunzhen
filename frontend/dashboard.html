@@ -209,7 +209,7 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
         <div class="input-row">
           <div class="param-group"><label>画面比例</label><select id="aspect-ratio"><option value="16:9" selected>16:9</option><option value="4:3">4:3</option><option value="3:4">3:4</option></select></div>
           <div class="param-group"><label>清晰度</label><select id="quality"><option value="1080p" selected>1080p</option><option value="720p">720p</option><option value="480p">480p</option></select></div>
-          <div class="param-group"><label>视频时长（秒）</label><input type="number" id="duration" value="5" min="5" max="60" step="1" style="width:80px;" oninput="updateCostPreview()"></div>
+          <div class="param-group"><label>视频时长（秒）</label><input type="number" id="duration" value="5" min="4" max="60" step="1" style="width:80px;" oninput="updateCostPreview()"></div>
           <div class="param-group"><label>预估消耗</label><span style="font-size:20px;font-weight:800;color:var(--accent2);" id="cost-preview">50</span><span style="font-size:12px;color:var(--text3);">积分</span></div>
           <button class="btn btn-accent" id="btn-gen" onclick="doGenerate()">🚀 开始生成</button>
         </div>
@@ -586,7 +586,7 @@ function doGenerate(){
   const quality=document.getElementById('quality').value;
   if(!prompt) return toast('请输入提示词','error');
   if(!model) return toast('请先选择模型','error');
-  if(duration<5||duration>60) return toast('视频时长需在5-60秒之间','error');
+  if(duration<4||duration>60) return toast('视频时长需在4-60秒之间','error');
   const pps=pricingMap[model]||10;
   if(!confirm('确认生成？\n\n模型：'+model+'\n时长：'+duration+'秒\n清晰度：'+quality+'\n预估消耗：'+(duration*pps)+' 积分\n\n积分将在生成前扣除，生成失败请联系客服。')) return;
 
