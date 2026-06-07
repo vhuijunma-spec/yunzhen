@@ -2060,12 +2060,21 @@ def generate():
                 channel_info = {"name": "天翼云", "base_url": CTYUN_BASE_URL, "id": 1, "api_key": CTYUN_API_KEY}
         conn3.close()
     else:
+        # 未登录也按模型匹配渠道
         conn_fb = _get_db()
-        fb = conn_fb.execute("SELECT id, name, base_url, api_key FROM channels WHERE status='active' ORDER BY id LIMIT 1").fetchone()
-        if fb:
-            channel_info = dict(fb)
+        model_ch = conn_fb.execute("""
+            SELECT ch.id, ch.name, ch.base_url, ch.api_key FROM channels ch
+            JOIN channel_model_pricing cmp ON cmp.channel_id = ch.id
+            WHERE cmp.model_name=? AND ch.status='active' LIMIT 1
+        """, (model,)).fetchone()
+        if model_ch:
+            channel_info = dict(model_ch)
         else:
-            channel_info = {"name": "天翼云", "base_url": CTYUN_BASE_URL, "id": 1, "api_key": CTYUN_API_KEY}
+            fb = conn_fb.execute("SELECT id, name, base_url, api_key FROM channels WHERE status='active' ORDER BY id LIMIT 1").fetchone()
+            if fb:
+                channel_info = dict(fb)
+            else:
+                channel_info = {"name": "天翼云", "base_url": CTYUN_BASE_URL, "id": 1, "api_key": CTYUN_API_KEY}
         conn_fb.close()
 
     headers = {"Authorization": f"Bearer {channel_info.get('api_key', '')}", "Content-Type": "application/json"}
