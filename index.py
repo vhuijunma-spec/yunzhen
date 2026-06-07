@@ -2137,19 +2137,29 @@ def generate():
                 query_url_path = "/video/generations/"
             else:
                 # 百度云 GoToken: 使用 metadata 传参
-                video_params = {
-                    "model": model, "prompt": prompt_text,
-                    "metadata": {
-                        "resolution": data.get("quality", "720p"),
-                        "ratio": size,
-                        "duration": duration,
-                        "watermark": False,
-                        "generate_audio": True,
-                    }
+                meta = {
+                    "resolution": data.get("quality", "720p"),
+                    "ratio": size,
+                    "duration": duration,
+                    "watermark": False,
+                    "generate_audio": True,
                 }
+                # 高级参数
+                if data.get("seed") is not None:
+                    meta["seed"] = int(data["seed"])
+                if data.get("service_tier"):
+                    meta["service_tier"] = data["service_tier"]
+                if data.get("return_last_frame"):
+                    meta["return_last_frame"] = True
+                video_params = {"model": model, "prompt": prompt_text, "metadata": meta}
                 # 图生视频：通过 images 数组传参考图
                 if image_url:
                     video_params["images"] = [image_url]
+                # 首尾帧
+                if data.get("first_frame_url"):
+                    video_params["first_frame_image"] = data["first_frame_url"]
+                if data.get("last_frame_url"):
+                    video_params["last_frame_image"] = data["last_frame_url"]
                 video_url_path = "/v1/video/generations"
                 query_url_path = "/v1/video/generations/"
 
@@ -2356,6 +2366,10 @@ def query_task(task_id):
                 remote_status = inner.get("status", td.get("status", ""))
                 task["baidu_status"] = remote_status
                 task["baidu_progress"] = td.get("progress", inner.get("progress", 0))
+                # 提取usage token
+                usage = td.get("usage", inner.get("usage", {}))
+                if usage:
+                    task["usage_tokens"] = usage.get("total_tokens", usage.get("completion_tokens", 0))
 
                 # 各种完成/失败状态
                 remote_status_lower = remote_status.lower()
@@ -2427,6 +2441,7 @@ def query_task(task_id):
     return jsonify({"code": 0, "task_id": task_id, "status": task["status"],
                     "video_url": task.get("video_url", ""), "content": task.get("content", ""),
                     "model": task.get("model", ""),
+                    "usage_tokens": task.get("usage_tokens", 0),
                     "baidu_status": task.get("baidu_status", ""),
                     "baidu_progress": task.get("baidu_progress", ""),
                     "remote_task_id": task.get("remote_task_id", ""),})

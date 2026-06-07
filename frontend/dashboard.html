@@ -198,6 +198,21 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
           <div class="param-group"><label>预估消耗</label><span style="font-size:20px;font-weight:800;color:var(--accent2);" id="cost-preview">50</span><span style="font-size:12px;color:var(--text3);">积分</span></div>
           <button class="btn btn-accent" id="btn-gen" onclick="doGenerate()">🚀 开始生成</button>
         </div>
+        <!-- 高级设置 -->
+        <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+          <button class="btn btn-outline btn-sm" onclick="var e=document.getElementById('advanced-settings');e.style.display=e.style.display==='none'?'block':'none';" style="font-size:11px;">⚙ 高级设置</button>
+          <div id="advanced-settings" style="display:none;margin-top:10px;">
+            <div class="input-row">
+              <div class="param-group"><label>随机种子</label><input type="number" id="gen-seed" placeholder="留空随机" style="width:100px;"></div>
+              <div class="param-group"><label>处理模式</label><select id="gen-tier"><option value="default">在线(default)</option><option value="flex">离线(flex · 半价)</option></select></div>
+              <div class="param-group"><label><input type="checkbox" id="gen-return-last"> 返回尾帧</label></div>
+            </div>
+            <div class="input-row" style="margin-top:8px;">
+              <div class="param-group"><label>首帧图URL</label><input type="text" id="gen-first-frame" placeholder="https://..." style="width:220px;"></div>
+              <div class="param-group"><label>尾帧图URL</label><input type="text" id="gen-last-frame" placeholder="https://..." style="width:220px;"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 进度条 -->
@@ -551,6 +566,15 @@ function doGenerate(){
 
   var genBody={model:model,text:prompt,duration:duration,size:document.getElementById('aspect-ratio').value,quality:quality,max_tokens:2048,temperature:0.8};
   if(genMode==='image' && uploadedImageUrl) genBody.image_url=uploadedImageUrl;
+  // 高级参数
+  var seed=document.getElementById('gen-seed').value.trim();
+  if(seed) genBody.seed=parseInt(seed);
+  genBody.service_tier=document.getElementById('gen-tier').value;
+  if(document.getElementById('gen-return-last').checked) genBody.return_last_frame=true;
+  var ff=document.getElementById('gen-first-frame').value.trim();
+  if(ff) genBody.first_frame_url=ff;
+  var lf=document.getElementById('gen-last-frame').value.trim();
+  if(lf) genBody.last_frame_url=lf;
   fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(genBody)}).then(r=>r.json()).then(d=>{
     btn.disabled=false; btn.textContent='🚀 开始生成';
     if(d.code===0){
@@ -604,7 +628,9 @@ function pollForVideo(taskId, quality, prompt, remoteId, channel) {
         } else {
           label.textContent = '🎬 视频生成中... (' + displayPct + '%)';
         }
-        eta.textContent = '第 ' + attempts + ' 次查询';
+        var info='第 ' + attempts + ' 次查询';
+        if(d.usage_tokens) info+= ' | Token: '+d.usage_tokens.toLocaleString();
+        eta.textContent=info;
         if (attempts < maxAttempts) {
           setTimeout(poll, 10000);
         }
