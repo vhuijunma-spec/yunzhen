@@ -1860,6 +1860,7 @@ def api_site_stats():
 @app.route("/ping", methods=["GET"])
 def ping():
     return jsonify({"ok": True, "time": datetime.now().isoformat(),
+                    "db": "postgresql" if USE_PG else "sqlite",
                     "ctyun_key_set": bool(os.environ.get("CTYUN_API_KEY")),
                     "gogo_key_set": bool(os.environ.get("GOGO_API_KEY"))})
 
