@@ -26,19 +26,26 @@ app.config["SESSION_COOKIE_SECURE"] = False
 
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "video-website")
 
-# CORS — 允许 Netlify 前端跨域访问
+# CORS + Request ID 中间件
 @app.after_request
 def _cors_headers(response):
     origin = request.headers.get("Origin", "")
-    # 允许本地开发 & Netlify 部署的域名
     allowed = ["http://localhost:9000", "http://localhost:3000", "http://localhost:5173",
                "https://yunzhen.netlify.app"]
     if origin in allowed or "netlify.app" in origin:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Request-Id"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    # 每个请求分配唯一 request_id
+    req_id = getattr(request, "request_id", str(uuid.uuid4())[:8])
+    response.headers["X-Request-Id"] = req_id
     return response
+
+@app.before_request
+def _assign_request_id():
+    request.request_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())[:8]
+    logger.info("[%s] %s %s", request.request_id, request.method, request.path)
 
 # ============================================================
 # 数据库
@@ -884,6 +891,7 @@ def api_update_channel(ch_id):
 @app.route("/api/pricing", methods=["GET"])
 def api_pricing():
     """获取渠道-模型积分定价"""
+    zone_map = {"天翼云": "ZoneA", "百度云": "ZoneB"}
     conn = _get_db()
     rows = conn.execute("""
         SELECT cmp.id, cmp.channel_id, ch.name AS channel_name,
@@ -894,7 +902,45 @@ def api_pricing():
         ORDER BY cmp.channel_id, cmp.points_per_second
     """).fetchall()
     conn.close()
-    return jsonify({"code": 0, "pricing": [dict(r) for r in rows]})
+    result = []
+    for r in rows:
+        d = dict(r)
+        d["channel_name"] = zone_map.get(d["channel_name"], d["channel_name"])
+        result.append(d)
+    return jsonify({"code": 0, "pricing": result})
+
+
+@app.route("/api/pricing/<int:ch_id>/<model_name>", methods=["PUT"])
+@admin_required
+def api_update_pricing(ch_id, model_name):
+    """管理员更新模型定价"""
+    data = request.get_json(silent=True) or {}
+    pps = int(data.get("points_per_second", 0))
+    if pps <= 0:
+        return jsonify({"code": 400, "message": "积分必须大于0"}), 400
+    conn = _get_db()
+    conn.execute(
+        "UPDATE channel_model_pricing SET points_per_second=? WHERE channel_id=? AND model_name=?",
+        (pps, ch_id, model_name)
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO channel_model_pricing (channel_id, model_name, points_per_second) VALUES (?, ?, ?)",
+        (ch_id, model_name, pps)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"code": 0, "message": "定价已更新"})
+
+
+@app.route("/api/config/exchange-rate", methods=["GET"])
+@admin_required
+def api_get_exchange():
+    """获取积分兑换配置"""
+    return jsonify({
+        "code": 0,
+        "points_per_yuan": int(os.environ.get("POINTS_PER_YUAN", "1")),
+        "description": "1元 = N积分"
+    })
 
 @app.route("/api/balance", methods=["GET"])
 @login_required
@@ -1348,11 +1394,64 @@ def api_me():
 #                      管理员 API                                 #
 # ============================================================ #
 
+@app.route("/api/salespersons", methods=["GET"])
+@admin_required
+def api_salespersons_list():
+    """获取所有销售员列表"""
+    conn = _get_db()
+    sps = conn.execute("""
+        SELECT s.id, s.name, s.code, s.phone, u.id AS user_id, u.username
+        FROM salespersons s
+        JOIN users u ON u.id = s.user_id
+        ORDER BY s.id
+    """).fetchall()
+    conn.close()
+    return jsonify({"code": 0, "salespersons": [dict(s) for s in sps]})
+
+
+@app.route("/api/users/<int:uid>/assign-salesperson", methods=["PUT"])
+@admin_required
+def api_assign_salesperson(uid):
+    """将用户关联到销售员"""
+    data = request.get_json(silent=True) or {}
+    sp_id = data.get("salesperson_id")
+    conn = _get_db()
+    if sp_id:
+        conn.execute(
+            "INSERT OR REPLACE INTO salesperson_customer (salesperson_id, user_id, created_at) VALUES (?, ?, ?)",
+            (sp_id, uid, datetime.now().isoformat()[:19])
+        )
+    else:
+        conn.execute("DELETE FROM salesperson_customer WHERE user_id=?", (uid,))
+    conn.commit()
+    conn.close()
+    return jsonify({"code": 0, "message": "关联已更新"})
+
+
 @app.route("/api/users", methods=["GET"])
 @admin_required
 def api_users():
+    sp_filter = request.args.get("salesperson_id", "")
     conn = _get_db()
-    users = conn.execute("SELECT id, username, email, phone, role, status, created_at FROM users ORDER BY id").fetchall()
+    if sp_filter:
+        users = conn.execute("""
+            SELECT u.id, u.username, u.email, u.phone, u.role, u.status, u.created_at,
+                   COALESCE(sp.name, '') AS salesperson_name, sp.id AS salesperson_id
+            FROM users u
+            JOIN salesperson_customer sc ON sc.user_id = u.id
+            JOIN salespersons sp ON sp.id = sc.salesperson_id
+            WHERE sc.salesperson_id = ?
+            ORDER BY u.id
+        """, (sp_filter,)).fetchall()
+    else:
+        users = conn.execute("""
+            SELECT u.id, u.username, u.email, u.phone, u.role, u.status, u.created_at,
+                   COALESCE(sp.name, '') AS salesperson_name, sp.id AS salesperson_id
+            FROM users u
+            LEFT JOIN salesperson_customer sc ON sc.user_id = u.id
+            LEFT JOIN salespersons sp ON sp.id = sc.salesperson_id
+            ORDER BY u.id
+        """).fetchall()
     conn.close()
     return jsonify({"code": 0, "users": [dict(u) for u in users]})
 
