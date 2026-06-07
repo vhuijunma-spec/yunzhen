@@ -48,14 +48,88 @@ def _assign_request_id():
     logger.info("[%s] %s %s", request.request_id, request.method, request.path)
 
 # ============================================================
-# 数据库
+# 数据库（支持 SQLite 本地 + PostgreSQL 生产）
 # ============================================================
 DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+USE_PG = bool(DATABASE_URL)
 
 def _get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """获取数据库连接（SQLite 或 PostgreSQL）"""
+    if USE_PG:
+        import psycopg2
+        import psycopg2.extras
+        conn = psycopg2.connect(DATABASE_URL)
+        # Monkey-patch: PG 兼容 SQLite 接口
+        _orig_exec = conn.execute
+        class _PGCursorWrapper:
+            def __init__(self, real_cur):
+                self.cur = real_cur
+                self.lastrowid = None
+            def fetchone(self):
+                row = self.cur.fetchone()
+                return dict(row) if row else None
+            def fetchall(self):
+                return [dict(r) for r in self.cur.fetchall()]
+            def close(self):
+                self.cur.close()
+        def _pg_execute(sql, params=()):
+            sql = re.sub(r'\?', '%s', str(sql))
+            # INSERT OR REPLACE → ON CONFLICT
+            m = re.match(r"INSERT OR REPLACE INTO\s+(\w+)\s*\((.+?)\)\s*VALUES\s*\((.+?)\)", sql, re.I | re.S)
+            if m:
+                tbl, cols, vals = m.group(1), m.group(2), m.group(3)
+                pk = _PG_PK.get(tbl, "id")
+                col_list = [c.strip() for c in cols.split(",")]
+                pk_cols = [c.strip() for c in pk.split(",")]
+                update_cols = [c + " = EXCLUDED." + c for c in col_list if c not in pk_cols]
+                if update_cols:
+                    sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s" % (tbl, cols, vals, pk, ", ".join(update_cols))
+                else:
+                    sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO NOTHING" % (tbl, cols, vals, pk)
+            # INSERT OR IGNORE → ON CONFLICT DO NOTHING
+            m = re.match(r"INSERT OR IGNORE INTO\s+(\w+)\s*\((.+?)\)\s*VALUES\s*\((.+?)\)", sql, re.I | re.S)
+            if m:
+                tbl, cols, vals, pk = m.group(1), m.group(2), m.group(3), _PG_PK.get(m.group(1), "id")
+                sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO NOTHING" % (tbl, cols, vals, pk)
+            # ALTER TABLE → PG兼容
+            if sql.strip().upper().startswith("ALTER TABLE") and "ADD COLUMN" in sql.upper():
+                sql = re.sub(r"ALTER TABLE\s+(\w+)\s+ADD COLUMN", r"ALTER TABLE \1 ADD COLUMN IF NOT EXISTS", sql, flags=re.I)
+            cur = conn.cursor()
+            try:
+                cur.execute(sql, params)
+                return _PGCursorWrapper(cur)
+            except Exception as e:
+                logger.error("PG SQL Error: %s | %s", str(e)[:200], sql[:200])
+                raise
+        conn.execute = _pg_execute
+        conn.commit = lambda: None  # autocommit already on
+        return conn
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+def _last_row_id(conn, table):
+    """获取最后插入的ID（PG兼容）"""
+    if USE_PG:
+        pk = _PG_PK.get(table, "id")
+        if "," in pk:
+            return 0
+        row = conn.execute("SELECT MAX(%s) AS id FROM %s" % (pk, table)).fetchone()
+        return row["id"] if row and row["id"] else 0
+    cur = conn.execute("SELECT last_insert_rowid() AS id")
+    row = cur.fetchone()
+    return row["id"] if isinstance(row, dict) else row[0]
+
+_PG_PK = {
+    "users": "id", "user_balance": "user_id", "user_settings": "user_id",
+    "salespersons": "id", "salesperson_customer": "id",
+    "channels": "id", "channel_model_pricing": "channel_id, model_name",
+    "videos": "id", "recharge_records": "id", "points_usage_records": "id",
+    "tasks": "id", "usage_records": "id", "user_channel_usage": "id",
+    "customer_allowed_models": "id", "transactions": "id",
+}
 
 def _init_db():
     conn = _get_db()
@@ -332,7 +406,7 @@ def _init_db():
                  generate_password_hash("888888"), "salesperson", "approved",
                  datetime.now().isoformat()[:19])
             )
-            sp_user_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            sp_user_id = _last_row_id(conn, "users")
             conn.execute(
                 "INSERT INTO salespersons (user_id, name, code, phone, created_at) VALUES (?, ?, ?, ?, ?)",
                 (sp_user_id, sp_name, sp_code, sp_phone, datetime.now().isoformat()[:19])
@@ -405,7 +479,7 @@ def _init_db():
             ("xiaoming", "xiaoming@qq.com", "13600001111", generate_password_hash("123456"), "user", "approved",
              datetime.now().isoformat()[:19])
         )
-        xm_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        xm_id = _last_row_id(conn, "users")
         conn.execute(
             "INSERT INTO user_balance (user_id, balance, total_deposit, total_used, points) VALUES (?, 0, 0, 0, 500)",
             (xm_id,)
@@ -429,7 +503,7 @@ def _init_db():
             ("zhangwei", "zhangwei@qq.com", "13700000001", generate_password_hash("123456"), "user", "approved",
              datetime.now().isoformat()[:19])
         )
-        zw_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        zw_id = _last_row_id(conn, "users")
         conn.execute(
             "INSERT INTO user_balance (user_id, balance, total_deposit, total_used, points) VALUES (?, 0, 0, 0, 500)",
             (zw_id,)
@@ -1171,7 +1245,7 @@ def api_register():
         (username, email, phone, generate_password_hash(password), "user", "pending",
          datetime.now().isoformat()[:19])
     )
-    new_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    new_id = _last_row_id(conn, "users")
 
     # 关联销售员
     if salesperson_id:
@@ -1291,7 +1365,7 @@ def api_create_sub_account():
         (username, email, phone, generate_password_hash(password), "user", "approved", uid,
          datetime.now().isoformat()[:19])
     )
-    new_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    new_id = _last_row_id(conn, "users")
 
     if main_sp:
         conn.execute(
@@ -1506,7 +1580,7 @@ def api_create_user():
         (username, email, phone, generate_password_hash(password), role, "approved",
          datetime.now().isoformat()[:19])
     )
-    new_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    new_id = _last_row_id(conn, "users")
     conn.execute("INSERT INTO user_balance (user_id, balance, total_deposit, total_used, points) VALUES (?, 0, 0, 0, 0)", (new_id,))
     conn.execute("INSERT INTO user_settings (user_id, selected_model, rate_per_second, updated_at) VALUES (?, '', 2.30, ?)",
                  (new_id, datetime.now().isoformat()[:19]))
@@ -1760,8 +1834,8 @@ def api_admin_tasks():
 @admin_required
 def api_site_stats():
     conn = _get_db()
-    total = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role='admin'").fetchone()[0]
+    total = conn.execute("SELECT COUNT(*) AS cnt FROM users").fetchone()["cnt"]
+    admin_count = conn.execute("SELECT COUNT(*) AS cnt FROM users WHERE role='admin'").fetchone()["cnt"]
     # 财务汇总
     fin = conn.execute("SELECT COALESCE(SUM(total_deposit),0) as td, COALESCE(SUM(total_used),0) as tu, COALESCE(SUM(points),0) as tp FROM user_balance").fetchone()
     conn.close()
