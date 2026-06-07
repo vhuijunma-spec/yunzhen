@@ -439,8 +439,8 @@ function loadModels(){
   }).catch(()=>{});
 }
 
-function getModelTag(name){ const k=name.toLowerCase(); if(k.includes('glm'))return'智谱AI'; if(k.includes('deepseek'))return'深度求索'; if(k.includes('kimi'))return'月之暗面'; if(k.includes('qwen'))return'阿里通义'; if(k.includes('doubao')||k.includes('seedance'))return'字节豆包'; if(k.includes('minimax'))return'MiniMax'; return'模型'; }
-function isBaiduModel(name){ return name && (name.indexOf('doubao')!==-1 || name.indexOf('seedance-1-5-pro')!==-1 || name.indexOf('seedance-2-0-')!==-1); }
+function getModelTag(name){ const k=name.toLowerCase(); if(k.includes('doubao-seedance-2-0-fast'))return'⚡快速版 720p'; if(k.includes('doubao-seedance-2-0'))return'🎬满血版 480p~1080p'; if(k.includes('glm'))return'智谱AI'; if(k.includes('deepseek'))return'深度求索'; if(k.includes('kimi'))return'月之暗面'; if(k.includes('qwen'))return'阿里通义'; return'模型'; }
+function isBaiduModel(name){ return name && name.indexOf('doubao')!==-1; }
 function extractResolution(name){
   if(!name) return '';
   var m=name.match(/(\d+)p/i); return m ? m[1]+'p' : '';
