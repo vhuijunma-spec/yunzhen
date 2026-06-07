@@ -1008,12 +1008,15 @@ def api_pricing():
 @app.route("/api/pricing/<int:ch_id>/<model_name>", methods=["PUT"])
 @admin_required
 def api_update_pricing(ch_id, model_name):
-    """管理员更新模型定价"""
+    """管理员更新模型定价，pps=0表示删除"""
     data = request.get_json(silent=True) or {}
     pps = int(data.get("points_per_second", 0))
-    if pps <= 0:
-        return jsonify({"code": 400, "message": "积分必须大于0"}), 400
     conn = _get_db()
+    if pps == 0:
+        conn.execute("DELETE FROM channel_model_pricing WHERE channel_id=? AND model_name=?", (ch_id, model_name))
+        conn.commit()
+        conn.close()
+        return jsonify({"code": 0, "message": "模型已删除"})
     conn.execute(
         "UPDATE channel_model_pricing SET points_per_second=? WHERE channel_id=? AND model_name=?",
         (pps, ch_id, model_name)
