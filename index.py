@@ -2160,6 +2160,16 @@ def generate():
                     video_params["first_frame_image"] = data["first_frame_url"]
                 if data.get("last_frame_url"):
                     video_params["last_frame_image"] = data["last_frame_url"]
+                # 视频生视频：参考视频传入 metadata.content
+                ref_video_url = (data.get("ref_video_url") or "").strip()
+                if ref_video_url and ref_video_url.startswith("/"):
+                    ref_video_url = request.host_url.rstrip("/") + ref_video_url
+                if ref_video_url:
+                    content_list = []
+                    if image_url:
+                        content_list.append({"type": "image_url", "image_url": {"url": image_url}, "role": "first_frame"})
+                    content_list.append({"type": "video_url", "video_url": {"url": ref_video_url}})
+                    meta["content"] = content_list
                 video_url_path = "/v1/video/generations"
                 query_url_path = "/v1/video/generations/"
 
@@ -2469,6 +2479,23 @@ def list_videos():
     conn.close()
     filtered = [v for v in _video_store if v.get("owner_id", 0) in group_users]
     return jsonify({"code": 0, "videos": filtered})
+
+
+@app.route("/api/upload-reference-video", methods=["POST"])
+def upload_ref_video():
+    """上传参考视频（用于视频生视频）"""
+    f = request.files.get("file")
+    if not f: return jsonify({"code": 400, "message": "请选择视频"}), 400
+    if not f.filename.lower().endswith(('.mp4','.avi','.mov','.webm','.mkv')):
+        return jsonify({"code": 400, "message": "仅支持 MP4/AVI/MOV/WebM/MKV"}), 400
+    if f.content_length and f.content_length > 200 * 1024 * 1024:
+        return jsonify({"code": 400, "message": "视频不超过200MB"}), 400
+    fname = f"ref_{uuid.uuid4().hex}_{f.filename}"
+    save_path = os.path.join(os.path.dirname(__file__), "uploads", fname)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    f.save(save_path)
+    url = f"/api/video-file/{fname}"
+    return jsonify({"code": 0, "url": url, "message": "上传成功"})
 
 
 @app.route("/api/upload-image", methods=["POST"])

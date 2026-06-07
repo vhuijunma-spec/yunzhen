@@ -170,7 +170,8 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
       <!-- 创作模式Tab -->
       <div style="display:flex;gap:0;margin-bottom:16px;">
         <button class="gen-tab active" id="tab-text" onclick="switchGenMode('text')" style="padding:10px 20px;border-radius:8px 0 0 8px;border:1px solid var(--border);background:rgba(99,102,241,0.12);color:var(--accent2);cursor:pointer;font-weight:600;font-size:14px;">📝 文生视频</button>
-        <button class="gen-tab" id="tab-image" onclick="switchGenMode('image')" style="padding:10px 20px;border-radius:0 8px 8px 0;border:1px solid var(--border);border-left:none;background:transparent;color:var(--text2);cursor:pointer;font-weight:600;font-size:14px;">🖼️ 图生视频</button>
+        <button class="gen-tab" id="tab-image" onclick="switchGenMode('image')" style="padding:10px 20px;border:1px solid var(--border);border-left:none;background:transparent;color:var(--text2);cursor:pointer;font-weight:600;font-size:14px;">🖼️ 图生视频</button>
+        <button class="gen-tab" id="tab-video" onclick="switchGenMode('video')" style="padding:10px 20px;border-radius:0 8px 8px 0;border:1px solid var(--border);border-left:none;background:transparent;color:var(--text2);cursor:pointer;font-weight:600;font-size:14px;">🎥 视频生视频</button>
       </div>
 
       <div class="input-box">
@@ -188,6 +189,20 @@ body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; bac
             <div style="flex:1;min-width:200px;">
               <textarea id="prompt-input-image" placeholder="描述图片如何生成视频...&#10;&#10;例如：让这只猫在草地上跑起来" style="min-height:130px;"></textarea>
               <div id="image-preview" style="display:none;margin-top:8px;font-size:12px;color:var(--green);"></div>
+            </div>
+          </div>
+        </div>
+        <!-- 视频生视频 -->
+        <div id="gen-video-area" style="display:none;">
+          <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div id="video-ref-upload-zone" style="width:200px;height:150px;border:2px dashed var(--border);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text3);font-size:13px;text-align:center;transition:.2s;flex-shrink:0;" onclick="document.getElementById('video-ref-input').click()">
+              🎥 点击上传参考视频<br><span style="font-size:11px;">MP4/AVI/MOV/WebM · ≤200MB</span>
+            </div>
+            <input type="file" id="video-ref-input" accept="video/*" style="display:none;" onchange="handleRefVideoUpload(event)">
+            <div style="flex:1;min-width:200px;">
+              <textarea id="prompt-input-video" placeholder="描述如何基于参考视频生成新视频...&#10;&#10;例如：保持这个场景和人物，让他转身微笑" style="min-height:80px;"></textarea>
+              <div style="margin-top:8px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;font-size:12px;color:var(--text3);">或输入参考视频URL：<input type="text" id="ref-video-url" placeholder="https://example.com/video.mp4" style="background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 8px;font-size:12px;width:250px;margin-left:6px;"></div>
+              <div id="ref-video-preview" style="display:none;margin-top:8px;font-size:12px;color:var(--green);"></div>
             </div>
           </div>
         </div>
@@ -507,15 +522,33 @@ function completeProgress(success) {
 // ========================================================
 var genMode='text';
 var uploadedImageUrl='';
+var uploadedRefVideoUrl='';
 
 function switchGenMode(mode){
   genMode=mode;
-  document.getElementById('tab-text').style.background=mode==='text'?'rgba(99,102,241,0.12)':'transparent';
-  document.getElementById('tab-text').style.color=mode==='text'?'var(--accent2)':'var(--text2)';
-  document.getElementById('tab-image').style.background=mode==='image'?'rgba(99,102,241,0.12)':'transparent';
-  document.getElementById('tab-image').style.color=mode==='image'?'var(--accent2)':'var(--text2)';
+  ['text','image','video'].forEach(function(m){
+    document.getElementById('tab-'+m).style.background=mode===m?'rgba(99,102,241,0.12)':'transparent';
+    document.getElementById('tab-'+m).style.color=mode===m?'var(--accent2)':'var(--text2)';
+  });
   document.getElementById('gen-text-area').style.display=mode==='text'?'block':'none';
   document.getElementById('gen-image-area').style.display=mode==='image'?'block':'none';
+  document.getElementById('gen-video-area').style.display=mode==='video'?'block':'none';
+}
+
+function handleRefVideoUpload(e){
+  var file=e.target.files[0];
+  if(!file) return;
+  if(!file.type.startsWith('video/')) return toast('请选择视频文件','error');
+  if(file.size>200*1024*1024) return toast('视频不超过200MB','error');
+  var form=new FormData(); form.append('file',file);
+  fetch('/api/upload-reference-video',{method:'POST',body:form}).then(r=>r.json()).then(d=>{
+    if(d.code===0){
+      uploadedRefVideoUrl=d.url;
+      document.getElementById('ref-video-preview').style.display='block';
+      document.getElementById('ref-video-preview').textContent='✅ 参考视频已上传';
+      document.getElementById('video-ref-upload-zone').style.borderColor='var(--green)';
+    } else toast(d.message||'上传失败','error');
+  }).catch(function(){toast('上传失败','error');});
 }
 
 function handleImageUpload(e){
@@ -536,7 +569,9 @@ function handleImageUpload(e){
 }
 
 function doGenerate(){
-  var promptArea=genMode==='image'?'prompt-input-image':'prompt-input';
+  var promptArea='prompt-input';
+  if(genMode==='image') promptArea='prompt-input-image';
+  else if(genMode==='video') promptArea='prompt-input-video';
   var prompt=document.getElementById(promptArea).value.trim();
   // 只从当前可见模型列表中取模型，防止使用已被禁用的模型
   const availableNames=allModels.map(function(m){return m.modelName;});
@@ -566,6 +601,11 @@ function doGenerate(){
 
   var genBody={model:model,text:prompt,duration:duration,size:document.getElementById('aspect-ratio').value,quality:quality,max_tokens:2048,temperature:0.8};
   if(genMode==='image' && uploadedImageUrl) genBody.image_url=uploadedImageUrl;
+  // 视频生视频
+  if(genMode==='video'){
+    var refVidUrl=document.getElementById('ref-video-url').value.trim()||uploadedRefVideoUrl;
+    if(refVidUrl) genBody.ref_video_url=refVidUrl;
+  }
   // 高级参数
   var seed=document.getElementById('gen-seed').value.trim();
   if(seed) genBody.seed=parseInt(seed);
