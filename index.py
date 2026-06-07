@@ -450,32 +450,7 @@ def _init_db():
                 (sp_user_id, datetime.now().isoformat()[:19])
             )
 
-    # --- 默认定价（天翼云渠道） 1积分/秒 = 1元/秒 ---
-    ch_id = conn.execute("SELECT id FROM channels WHERE name='天翼云'").fetchone()["id"]
-    default_pricing = [
-        ("GLM-5.0",  1), ("GLM-5.1",    1), ("DeepSeek-V3", 1),
-        ("Kimi-K2.5", 1), ("Kimi-K2.6",  1), ("qwen-plus",   1),
-    ]
-    for mname, pts in default_pricing:
-        conn.execute(
-            "INSERT OR IGNORE INTO channel_model_pricing (channel_id, model_name, points_per_second) VALUES (?, ?, ?)",
-            (ch_id, mname, pts)
-        )
-    # --- 默认定价（天翼云视频模型） ---
-    ty_video = [
-        ("seedance-1.0", 1), ("seedance-1.5", 1), ("seedance-2.0", 1),
-        ("qwen-video", 1),
-    ]
-    for mname, pts in ty_video:
-        conn.execute(
-            "INSERT OR IGNORE INTO channel_model_pricing (channel_id, model_name, points_per_second) VALUES (?, ?, ?)",
-            (ch_id, mname, pts)
-        )
-    # 统一更新天翼云所有定价为1积分/秒
-    conn.execute(
-        "UPDATE channel_model_pricing SET points_per_second=1 WHERE channel_id=?",
-        (ch_id,)
-    )
+    # 天翼云/百度云统一定价已在上方处理，不再添加旧模型
     # --- 默认定价（百度云渠道） ---
     ch2_id = conn.execute("SELECT id FROM channels WHERE name='百度云'").fetchone()["id"]
     baidu_pricing = [
@@ -1986,17 +1961,16 @@ def list_models():
     conn.close()
 
     zone_map = {"天翼云": "ZoneA", "百度云": "ZoneB"}
-    # 百度云只保留2个基础模型，过滤掉分辨率后缀的旧模型
-    BAIDU_BASE_MODELS = {"doubao-seedance-2-0", "doubao-seedance-2-0-fast"}
+    # 全站仅显示 doubao-seedance-2-0 和 fast 两个模型
+    ALLOWED_MODELS = {"doubao-seedance-2-0", "doubao-seedance-2-0-fast"}
     all_models = []
     for r in rows:
-        if r["model_name"] in disabled_set:
+        mname = r["model_name"]
+        if mname in disabled_set:
+            continue
+        if mname not in ALLOWED_MODELS:
             continue
         ch_name = r["channel_name"]
-        mname = r["model_name"]
-        # 百度云渠道：只显示基础模型
-        if ch_name == "百度云" and mname not in BAIDU_BASE_MODELS:
-            continue
         all_models.append({
             "modelName": mname,
             "channel_id": r["channel_id"],
