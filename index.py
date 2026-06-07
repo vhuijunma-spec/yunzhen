@@ -333,9 +333,24 @@ def _init_db():
             url         TEXT    NOT NULL,
             is_remote   INTEGER NOT NULL DEFAULT 0,
             owner_id    INTEGER NOT NULL,
+            prompt_text TEXT    DEFAULT '',
+            model_name  TEXT    DEFAULT '',
+            duration    INTEGER DEFAULT 0,
+            category    TEXT    DEFAULT '',
             created_at  TEXT    NOT NULL,
             FOREIGN KEY (owner_id) REFERENCES users(id)
         )
+    """)
+    # 兼容已有数据库：添加新列
+    for col in ["prompt_text", "model_name", "duration", "category"]:
+        try:
+            conn.execute("ALTER TABLE videos ADD COLUMN %s TEXT DEFAULT ''" % col)
+        except:
+            pass
+    try:
+        conn.execute("ALTER TABLE videos ADD COLUMN duration INTEGER DEFAULT 0")
+    except:
+        pass
     """)
     # 任务持久化表
     conn.execute("""
@@ -1019,19 +1034,47 @@ def api_update_pricing(ch_id, model_name):
 
 @app.route("/api/showcase", methods=["GET"])
 def api_showcase():
-    """公开视频广场 — 无需登录"""
+    """公开视频广场 — 无需登录，支持分类筛选"""
+    cat = request.args.get("category", "")
     videos = [v for v in _video_store if v.get("url", "").startswith("/api/video-file/")]
     result = []
-    for v in videos[-20:]:  # 最近20个
-        result.append({
+    for v in videos:
+        item = {
             "id": v.get("id", ""),
             "name": v.get("name", "AI视频")[:30],
             "url": v.get("url", ""),
             "created_at": v.get("created_at", ""),
             "owner_name": "用户" + str(v.get("owner_id", "")),
-        })
+            "category": v.get("category", "") or _detect_category(v.get("prompt_text", v.get("name", ""))),
+            "model_name": v.get("model_name", ""),
+            "duration": v.get("duration", 0),
+        }
+        if not cat or item["category"] == cat:
+            result.append(item)
     result.reverse()
-    return jsonify({"code": 0, "videos": result})
+    return jsonify({"code": 0, "videos": result[:20]})
+
+
+@app.route("/api/video-detail/<vid>", methods=["GET"])
+def api_video_detail(vid):
+    """视频详情 — 无需登录"""
+    for v in _video_store:
+        if v.get("id") == vid:
+            return jsonify({
+                "code": 0,
+                "video": {
+                    "id": v.get("id", ""),
+                    "name": v.get("name", ""),
+                    "url": v.get("url", ""),
+                    "created_at": v.get("created_at", ""),
+                    "prompt_text": v.get("prompt_text", ""),
+                    "model_name": v.get("model_name", ""),
+                    "duration": v.get("duration", 0),
+                    "category": v.get("category", "") or _detect_category(v.get("prompt_text", v.get("name", ""))),
+                    "owner_id": v.get("owner_id", 0),
+                }
+            })
+    return jsonify({"code": 404, "message": "视频不存在"}), 404
 
 
 @app.route("/api/config/exchange-rate", methods=["GET"])
@@ -1206,6 +1249,10 @@ def dashboard_page():
 @app.route("/admin")
 def admin_page():
     return _serve_html("admin.html")
+
+@app.route("/detail")
+def detail_page():
+    return _serve_html("detail.html")
 
 @app.route("/showcase")
 def showcase_page():
@@ -2342,6 +2389,9 @@ def query_task(task_id):
                         "id": vid, "name": (task.get("text", "") or "AI生成视频")[:40],
                         "url": local_url, "is_remote": False,
                         "owner_id": task.get("owner_id", 0),
+                        "prompt_text": task.get("text", ""),
+                        "model_name": task.get("model", ""),
+                        "duration": 5,
                         "created_at": datetime.now().isoformat()[:10],
                     }
                     _video_store.append(video_entry)
@@ -2544,13 +2594,34 @@ def _load_task_from_db(task_id):
 # 将视频保存到数据库
 def _save_video_to_db(video):
     conn = _get_db()
+    # 自动分类
+    prompt = (video.get("text") or video.get("prompt_text") or video.get("name") or "")
+    cat = _detect_category(prompt)
     conn.execute(
-        "INSERT OR REPLACE INTO videos (id, name, url, is_remote, owner_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-        (video["id"], video["name"], video["url"], 1 if video.get("is_remote") else 0,
-         video.get("owner_id", 1), video.get("created_at", datetime.now().isoformat()[:10]))
+        "INSERT OR REPLACE INTO videos (id, name, url, is_remote, owner_id, prompt_text, model_name, duration, category, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (video["id"], video.get("name", ""), video.get("url", ""),
+         1 if video.get("is_remote") else 0,
+         video.get("owner_id", 1),
+         prompt[:500],
+         video.get("model_name") or video.get("model", ""),
+         video.get("duration", 0),
+         cat,
+         video.get("created_at", datetime.now().isoformat()[:10]))
     )
     conn.commit()
     conn.close()
+
+def _detect_category(text):
+    """根据提示词自动分类"""
+    t = (text or "").lower()
+    if any(w in t for w in ["短剧", "剧情", "故事", "剧本", "对白", "情节"]): return "短剧"
+    if any(w in t for w in ["解说", "讲解", "介绍", "测评", "旁白"]): return "解说"
+    if any(w in t for w in ["广告", "宣传", "推广", "产品", "品牌"]): return "广告"
+    if any(w in t for w in ["动画", "卡通", "动漫", "二次元", "3d"]): return "动画"
+    if any(w in t for w in ["风景", "自然", "旅行", "城市", "天空"]): return "风景"
+    if any(w in t for w in ["人物", "角色", "人物特写", "肖像"]): return "人物"
+    if any(w in t for w in ["动物", "猫", "狗", "宠物", "野生动物"]): return "动物"
+    return "创意"
 
 # 启动时恢复视频库（从 DB + uploads 目录）
 def _restore_video_store():
@@ -2564,6 +2635,10 @@ def _restore_video_store():
         _video_store.append({
             "id": r["id"], "name": r["name"], "url": r["url"],
             "is_remote": bool(r["is_remote"]), "owner_id": r["owner_id"],
+            "prompt_text": r["prompt_text"] if "prompt_text" in r.keys() else "",
+            "model_name": r["model_name"] if "model_name" in r.keys() else "",
+            "duration": r["duration"] if "duration" in r.keys() else 0,
+            "category": r["category"] if "category" in r.keys() else "",
             "created_at": r["created_at"][:10],
         })
     # 补充：uploads 目录中有但 DB 中没有的文件
