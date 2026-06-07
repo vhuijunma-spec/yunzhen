@@ -1962,14 +1962,15 @@ def generate():
     messages = data.get("messages", [])
     text     = (data.get("text") or "").strip()
     duration = data.get("duration", 0)
-    size     = data.get("size", "16:9")  # 百度云视频比例参数
+    size     = data.get("size", "16:9")
+    image_url = (data.get("image_url") or "").strip()  # 图生视频
 
     if not messages and text:
         messages = [{"role": "user", "content": text}]
     if not model:
         return jsonify({"code": 400, "message": "请选择模型"}), 400
-    if not messages:
-        return jsonify({"code": 400, "message": "请输入内容"}), 400
+    if not messages and not image_url:
+        return jsonify({"code": 400, "message": "请输入内容或上传图片"}), 400
     if not duration or int(duration) < 5:
         return jsonify({"code": 400, "message": "请选择视频时长（最少5秒）"}), 400
 
@@ -2073,6 +2074,8 @@ def generate():
                         "watermark": False,
                     }
                 }
+                if image_url:
+                    video_params["image_url"] = image_url
                 video_url_path = "/video/generations"
                 query_url_path = "/video/generations/"
             else:
@@ -2081,8 +2084,9 @@ def generate():
                     "model": model, "prompt": prompt_text,
                     "seconds": str(duration), "size": size,
                 }
+                if image_url:
+                    video_params["image_url"] = image_url
                 video_url_path = "/videos"
-                # 百度云统一用 /videos/:id 查询
                 query_url_path = "/videos/"
 
             logger.info("%s提交视频: %s", ch_name, video_params)
@@ -2378,6 +2382,26 @@ def list_videos():
     conn.close()
     filtered = [v for v in _video_store if v.get("owner_id", 0) in group_users]
     return jsonify({"code": 0, "videos": filtered})
+
+
+@app.route("/api/upload-image", methods=["POST"])
+def upload_image():
+    """上传参考图片（用于图生视频）"""
+    f = request.files.get("file")
+    if not f: return jsonify({"code": 400, "message": "请选择图片"}), 400
+    if not f.filename.lower().endswith(('.jpg','.jpeg','.png','.webp','.gif')):
+        return jsonify({"code": 400, "message": "仅支持 JPG/PNG/WebP/GIF"}), 400
+    fname = f"img_{uuid.uuid4().hex}_{f.filename}"
+    save_path = os.path.join(os.path.dirname(__file__), "uploads", fname)
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    f.save(save_path)
+    url = f"/api/image-file/{fname}"
+    return jsonify({"code": 0, "url": url, "message": "上传成功"})
+
+
+@app.route("/api/image-file/<fname>", methods=["GET"])
+def serve_image(fname):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), "uploads"), fname)
 
 
 @app.route("/api/upload", methods=["POST"])
