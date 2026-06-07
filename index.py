@@ -57,25 +57,39 @@ USE_PG = True
 def _get_db():
     """获取数据库连接（SQLite 或 PostgreSQL）"""
     if USE_PG:
-        import psycopg2
-        import psycopg2.extras
-        conn = psycopg2.connect(DATABASE_URL)
-        # Monkey-patch: PG 兼容 SQLite 接口
+        import psycopg
+        conn = psycopg.connect(DATABASE_URL)
+        conn.autocommit = True
+        # Monkey-patch: PG 兼容 SQLite 接口（psycopg3 原生支持 conn.execute）
         _orig_exec = conn.execute
         class _PGCursorWrapper:
-            def __init__(self, real_cur):
-                self.cur = real_cur
+            def __init__(self, cur):
+                self.cur = cur
                 self.lastrowid = None
             def fetchone(self):
-                row = self.cur.fetchone()
-                return dict(row) if row else None
+                try:
+                    row = self.cur.fetchone()
+                    if row is None: return None
+                    if isinstance(row, dict): return row
+                    cols = [d[0] for d in self.cur.description]
+                    return dict(zip(cols, row))
+                except: return None
             def fetchall(self):
-                return [dict(r) for r in self.cur.fetchall()]
-            def close(self):
-                self.cur.close()
+                try:
+                    rows = self.cur.fetchall()
+                    if not rows: return []
+                    if isinstance(rows[0], dict): return rows
+                    cols = [d[0] for d in self.cur.description]
+                    return [dict(zip(cols, r)) for r in rows]
+                except: return []
+            def close(self): pass
         def _pg_execute(sql, params=()):
             sql = re.sub(r'\?', '%s', str(sql))
-            # INSERT OR REPLACE → ON CONFLICT
+            # CREATE TABLE → PG兼容
+            if sql.strip().upper().startswith("CREATE TABLE"):
+                sql = sql.replace("AUTOINCREMENT", "")
+                sql = sql.replace("INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY")
+                sql = sql.replace("SERIAL PRIMARY KEY NOT NULL", "SERIAL PRIMARY KEY")
             m = re.match(r"INSERT OR REPLACE INTO\s+(\w+)\s*\((.+?)\)\s*VALUES\s*\((.+?)\)", sql, re.I | re.S)
             if m:
                 tbl, cols, vals = m.group(1), m.group(2), m.group(3)
@@ -87,12 +101,10 @@ def _get_db():
                     sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO UPDATE SET %s" % (tbl, cols, vals, pk, ", ".join(update_cols))
                 else:
                     sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO NOTHING" % (tbl, cols, vals, pk)
-            # INSERT OR IGNORE → ON CONFLICT DO NOTHING
             m = re.match(r"INSERT OR IGNORE INTO\s+(\w+)\s*\((.+?)\)\s*VALUES\s*\((.+?)\)", sql, re.I | re.S)
             if m:
                 tbl, cols, vals, pk = m.group(1), m.group(2), m.group(3), _PG_PK.get(m.group(1), "id")
                 sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO NOTHING" % (tbl, cols, vals, pk)
-            # ALTER TABLE → PG兼容
             if sql.strip().upper().startswith("ALTER TABLE") and "ADD COLUMN" in sql.upper():
                 sql = re.sub(r"ALTER TABLE\s+(\w+)\s+ADD COLUMN", r"ALTER TABLE \1 ADD COLUMN IF NOT EXISTS", sql, flags=re.I)
             cur = conn.cursor()
@@ -103,7 +115,6 @@ def _get_db():
                 logger.error("PG SQL Error: %s | %s", str(e)[:200], sql[:200])
                 raise
         conn.execute = _pg_execute
-        conn.commit = lambda: None  # autocommit already on
         return conn
     else:
         conn = sqlite3.connect(DB_PATH)
@@ -116,8 +127,8 @@ def _last_row_id(conn, table):
         pk = _PG_PK.get(table, "id")
         if "," in pk:
             return 0
-        row = conn.execute("SELECT MAX(%s) AS id FROM %s" % (pk, table)).fetchone()
-        return row["id"] if row and row["id"] else 0
+        row = conn.execute("SELECT MAX(" + pk + ") AS id FROM " + table).fetchone()
+        return row["id"] if row and row.get("id") else 0
     cur = conn.execute("SELECT last_insert_rowid() AS id")
     row = cur.fetchone()
     return row["id"] if isinstance(row, dict) else row[0]
