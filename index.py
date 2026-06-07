@@ -490,7 +490,12 @@ def _init_db():
         )
     # 更新已有百度云定价为1积分/秒，删除旧的分辨率细分模型
     conn.execute("UPDATE channel_model_pricing SET points_per_second=1 WHERE channel_id=?", (ch2_id,))
-    conn.execute("DELETE FROM channel_model_pricing WHERE channel_id=? AND model_name LIKE '%seedance%' AND model_name NOT IN ('doubao-seedance-2-0','doubao-seedance-2-0-fast')", (ch2_id,))
+    # 删除旧的分辨率细分模型（避免 PG % 占位符冲突，用精确匹配）
+    old_models = ["doubao-seedance-1-5-pro_480p","doubao-seedance-1-5-pro_720p","doubao-seedance-1-5-pro_1080p",
+                  "doubao-seedance-2-0-480p","doubao-seedance-2-0-720p","doubao-seedance-2-0-1080p",
+                  "doubao-seedance-2-0-fast-480p","doubao-seedance-2-0-fast-720p","doubao-seedream-4-5-251128"]
+    for old_m in old_models:
+        conn.execute("DELETE FROM channel_model_pricing WHERE channel_id=? AND model_name=?", (ch2_id, old_m))
 
     # --- 固定测试客户 xiaoming ---
     xm = conn.execute("SELECT id FROM users WHERE username='xiaoming'").fetchone()
