@@ -1617,6 +1617,19 @@ def api_update_user(uid):
             )
             changes.append(f"points={new_points} balance={new_balance} (新建)")
 
+    # 如果余额/积分有变化，记录充值
+    if "balance" in data or "points" in data:
+        old_bal = conn.execute("SELECT balance, points FROM user_balance WHERE user_id=?", (uid,)).fetchone()
+        if old_bal:
+            new_bal = float(data.get("balance", old_bal["balance"])) if "balance" in data else old_bal["balance"]
+            amount_diff = new_bal - old_bal["balance"]
+            if amount_diff != 0:
+                conn.execute(
+                    "INSERT INTO recharge_records (user_id, amount, balance_before, balance_after, created_by, description, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (uid, amount_diff, old_bal["balance"], new_bal,
+                     session["user_id"], "管理员手动调整", datetime.now().isoformat()[:19])
+                )
+
     conn.commit()
     conn.close()
     logger.info("管理员更新用户 %s: %s", u["username"], ", ".join(changes))
