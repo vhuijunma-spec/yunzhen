@@ -24,7 +24,9 @@ app.secret_key = os.environ.get("SECRET_KEY", uuid.uuid4().hex)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = False
 
-FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "video-website")
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+if not os.path.isdir(FRONTEND_DIR):
+    FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "video-website")
 
 # CORS + Request ID 中间件
 @app.after_request

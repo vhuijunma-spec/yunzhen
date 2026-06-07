@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视频详情 — 云帧 AI</title>
+<style>
+:root { --bg:#0a0a0f;--bg2:#111118;--card:#181820;--border:#25252d;--text:#e8e8ed;--text2:#9898a8;--text3:#5c5c6e;--accent:#6366f1;--accent2:#818cf8;--orange:#f59e0b;--green:#22c55e;--radius:16px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+.navbar { display:flex; justify-content:space-between; align-items:center; padding:0 40px; height:64px; background:rgba(10,10,15,0.92); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
+.nav-logo { font-size:22px; font-weight:800; }
+.nav-logo span { color:var(--accent2); }
+.nav-links { display:flex; gap:10px; align-items:center; }
+.nav-links a { color:var(--text2); text-decoration:none; font-size:14px; padding:8px 16px; border-radius:8px; transition:.2s; }
+.nav-links a:hover { color:var(--text); background:var(--card); }
+.nav-links .btn-nav { background:var(--accent); color:#fff; font-weight:600; }
+
+.container { max-width:1100px; margin:0 auto; padding:40px 20px; }
+.video-main { display:grid; grid-template-columns:1fr 360px; gap:24px; margin-bottom:30px; }
+.video-player { background:#000; border-radius:var(--radius); overflow:hidden; }
+.video-player video { width:100%; max-height:500px; display:block; }
+.video-sidebar { display:flex; flex-direction:column; gap:16px; }
+.info-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:20px; }
+.info-card h3 { font-size:16px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.info-card .info-row { display:flex; justify-content:space-between; padding:8px 0; font-size:13px; border-bottom:1px solid var(--border); }
+.info-card .info-row:last-child { border-bottom:none; }
+.info-card .info-label { color:var(--text3); }
+.info-card .info-value { color:var(--text); font-weight:600; text-align:right; }
+.badge-cat { display:inline-block; padding:3px 12px; border-radius:12px; font-size:12px; font-weight:600; }
+.badge-cat.短剧 { background:rgba(245,158,11,0.15); color:var(--orange); }
+.badge-cat.解说 { background:rgba(99,102,241,0.15); color:var(--accent2); }
+.badge-cat.创意 { background:rgba(34,197,94,0.15); color:var(--green); }
+.badge-cat.动画 { background:rgba(236,72,153,0.15); color:#ec4899; }
+.badge-cat.广告 { background:rgba(239,68,68,0.15); color:#ef4444; }
+.badge-cat.人物 { background:rgba(59,130,246,0.15); color:#3b82f6; }
+.badge-cat.动物 { background:rgba(168,85,247,0.15); color:#a855f7; }
+.badge-cat.风景 { background:rgba(34,197,94,0.15); color:var(--green); }
+.prompt-box { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:14px; font-size:13px; color:var(--text2); white-space:pre-wrap; word-break:break-word; max-height:200px; overflow-y:auto; }
+.related-section { margin-top:30px; }
+.related-section h3 { font-size:18px; font-weight:700; margin-bottom:16px; }
+.related-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+.related-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; cursor:pointer; transition:.2s; }
+.related-card:hover { border-color:var(--accent); }
+.related-card video { width:100%; height:160px; object-fit:cover; background:#000; }
+.related-card .r-info { padding:12px; font-size:13px; }
+.related-card .r-name { font-weight:600; margin-bottom:2px; }
+.related-card .r-cat { font-size:11px; color:var(--text3); }
+
+@media (max-width:900px) {
+  .video-main { grid-template-columns:1fr; }
+  .video-sidebar { flex-direction:column; }
+}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-logo"><a href="/" style="color:inherit;text-decoration:none;">云帧 <span>AI</span></a></div>
+  <div class="nav-links">
+    <a href="/showcase">🎬 作品广场</a>
+    <a href="/dashboard">工作台</a>
+    <a href="/login">登录</a>
+  </div>
+</nav>
+
+<div class="container" id="detail-content">
+  <div style="text-align:center;padding:80px;color:var(--text3);">加载中...</div>
+</div>
+
+<script>
+var vid=new URLSearchParams(location.search).get('id');
+if(!vid) location.href='/showcase';
+
+fetch('/api/video-detail/'+vid).then(r=>r.json()).then(d=>{
+  if(d.code!==0){ document.getElementById('detail-content').innerHTML='<div style="text-align:center;padding:80px;color:var(--text3);">视频不存在</div>'; return; }
+  var v=d.video;
+  var cat=v.category||'创意';
+  document.title=v.name+' — 云帧 AI';
+  document.getElementById('detail-content').innerHTML=
+    '<div class="video-main">'+
+      '<div class="video-player"><video src="'+v.url+'" controls autoplay></video></div>'+
+      '<div class="video-sidebar">'+
+        '<div class="info-card"><h3>'+esc(v.name)+'</h3><span class="badge-cat '+cat+'">'+cat+'</span></div>'+
+        '<div class="info-card"><h3>📋 视频信息</h3>'+
+          '<div class="info-row"><span class="info-label">分类</span><span class="info-value">'+cat+'</span></div>'+
+          '<div class="info-row"><span class="info-label">模型</span><span class="info-value">'+esc(v.model_name||'AI模型')+'</span></div>'+
+          '<div class="info-row"><span class="info-label">时长</span><span class="info-value">'+(v.duration||'?')+'秒</span></div>'+
+          '<div class="info-row"><span class="info-label">日期</span><span class="info-value">'+(v.created_at||'')+'</span></div>'+
+        '</div>'+
+        (v.prompt_text?'<div class="info-card"><h3>💬 提示词</h3><div class="prompt-box">'+esc(v.prompt_text)+'</div></div>':'')+
+      '</div>'+
+    '</div>'+
+    '<div class="related-section"><h3>🎬 同分类作品</h3><div class="related-grid" id="related-grid">加载中...</div></div>';
+
+  // 相关推荐
+  fetch('/api/showcase?category='+encodeURIComponent(cat)).then(r=>r.json()).then(d2=>{
+    var related=(d2.videos||[]).filter(function(rv){return rv.id!==vid;}).slice(0,4);
+    var grid=document.getElementById('related-grid');
+    if(related.length===0){ grid.innerHTML='<div style="color:var(--text3);padding:20px;">暂无相关作品</div>'; return; }
+    grid.innerHTML=related.map(function(rv){
+      return '<div class="related-card" onclick="location.href=\'/detail?id='+rv.id+'\'"><video src="'+rv.url+'" preload="metadata"></video><div class="r-info"><div class="r-name">'+esc(rv.name)+'</div><div class="r-cat"><span class="badge-cat '+(rv.category||'创意')+'">'+(rv.category||'创意')+'</span> · '+rv.created_at+'</div></div></div>';
+    }).join('');
+  }).catch(function(){});
+}).catch(function(){ location.href='/showcase'; });
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>

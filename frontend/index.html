@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>云帧 — AI视频创作平台</title>
+<style>
+:root { --bg:#0a0a0f;--bg2:#111118;--card:#181820;--border:#25252d;--text:#e8e8ed;--text2:#9898a8;--text3:#5c5c6e;--accent:#6366f1;--accent2:#818cf8;--green:#22c55e;--orange:#f59e0b;--radius:16px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; overflow-x:hidden; }
+
+/* Nav */
+.navbar { display:flex; justify-content:space-between; align-items:center; padding:0 40px; height:64px; background:rgba(10,10,15,0.92); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
+.nav-logo { font-size:22px; font-weight:800; letter-spacing:1px; }
+.nav-logo span { color:var(--accent2); }
+.nav-links { display:flex; gap:10px; align-items:center; }
+.nav-links a { color:var(--text2); text-decoration:none; font-size:14px; padding:8px 16px; border-radius:8px; transition:.2s; }
+.nav-links a:hover { color:var(--text); background:var(--card); }
+.nav-links .btn-nav { background:var(--accent); color:#fff; font-weight:600; }
+.nav-links .btn-nav:hover { background:var(--accent2); }
+
+/* Hero */
+.hero { position:relative; padding:100px 40px 120px; text-align:center; overflow:hidden; }
+.hero::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle at 50% 50%, rgba(99,102,241,0.08) 0%, transparent 60%), radial-gradient(circle at 80% 20%, rgba(245,158,11,0.06) 0%, transparent 50%); animation:rotate 30s linear infinite; }
+@keyframes rotate { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+.hero h1 { font-size:52px; font-weight:900; letter-spacing:-1px; position:relative; z-index:1; }
+.hero h1 span { background:linear-gradient(135deg,var(--accent2),var(--orange)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.hero p { font-size:18px; color:var(--text2); margin:20px 0 36px; position:relative; z-index:1; max-width:600px; margin-left:auto; margin-right:auto; }
+.hero-btns { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; position:relative; z-index:1; }
+.btn { padding:14px 32px; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; border:none; transition:.2s; text-decoration:none; display:inline-block; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:var(--accent2); transform:translateY(-2px); }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text2); }
+.btn-outline:hover { border-color:var(--accent2); color:var(--text); }
+.btn-orange { background:var(--orange); color:#000; }
+.btn-orange:hover { transform:translateY(-2px); }
+
+/* Stats */
+.stats { display:flex; justify-content:center; gap:60px; padding:20px 40px 60px; flex-wrap:wrap; }
+.stat-item { text-align:center; }
+.stat-num { font-size:36px; font-weight:900; color:var(--accent2); }
+.stat-label { font-size:13px; color:var(--text3); margin-top:4px; }
+
+/* Section */
+.section { padding:60px 40px; max-width:1200px; margin:0 auto; }
+.section-title { font-size:28px; font-weight:800; margin-bottom:12px; text-align:center; }
+.section-sub { font-size:15px; color:var(--text3); text-align:center; margin-bottom:40px; }
+
+/* Model Cards */
+.model-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+.model-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:24px; transition:.2s; }
+.model-card:hover { border-color:var(--accent); transform:translateY(-4px); }
+.model-card .mc-icon { font-size:36px; margin-bottom:12px; }
+.model-card .mc-name { font-size:18px; font-weight:700; margin-bottom:6px; }
+.model-card .mc-desc { font-size:13px; color:var(--text2); margin-bottom:12px; }
+.model-card .mc-tags { display:flex; gap:6px; flex-wrap:wrap; }
+.mc-tag { font-size:11px; padding:3px 10px; border-radius:10px; background:rgba(99,102,241,0.12); color:var(--accent2); }
+
+/* Video Grid */
+.video-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; }
+.video-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; transition:.2s; }
+.video-card:hover { border-color:var(--accent); }
+.video-card video { width:100%; height:200px; object-fit:cover; background:#000; }
+.video-card .v-info { padding:14px; }
+.video-card .v-name { font-size:14px; font-weight:600; }
+.video-card .v-meta { font-size:11px; color:var(--text3); margin-top:4px; }
+
+/* Footer */
+.footer { border-top:1px solid var(--border); padding:30px 40px; text-align:center; color:var(--text3); font-size:13px; }
+
+@media (max-width:768px) {
+  .hero h1 { font-size:32px; }
+  .hero { padding:60px 20px 80px; }
+  .section { padding:40px 20px; }
+  .stats { gap:30px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ 导航栏 ============ -->
+<nav class="navbar">
+  <div class="nav-logo">云帧 <span>AI</span></div>
+  <div class="nav-links">
+    <a href="/showcase">🎬 作品广场</a>
+    <a href="/dashboard">工作台</a>
+    <a href="/login">登录</a>
+    <a href="/register" class="btn-nav">免费注册</a>
+  </div>
+</nav>
+
+<!-- ============ 英雄区 ============ -->
+<section class="hero">
+  <h1>AI视频创作<br><span>一句话，生成你的故事</span></h1>
+  <p>集成豆包 Seedance、通义千问等业界顶级模型，文本/图片一键生成高质量视频，电影级画质，企业级稳定</p>
+  <div class="hero-btns">
+    <a href="/dashboard" class="btn btn-primary">🚀 开始创作</a>
+    <a href="/showcase" class="btn btn-outline">🎬 浏览作品</a>
+    <a href="/dashboard" class="btn btn-orange">⚡ 快速体验 Seedance 2.0</a>
+  </div>
+</section>
+
+<!-- ============ 数据 ============ -->
+<div class="stats">
+  <div class="stat-item"><div class="stat-num" id="home-videos">-</div><div class="stat-label">生成视频</div></div>
+  <div class="stat-item"><div class="stat-num" id="home-users">-</div><div class="stat-label">创作者</div></div>
+  <div class="stat-item"><div class="stat-num">2</div><div class="stat-label">AI 模型引擎</div></div>
+</div>
+
+<!-- ============ 模型引擎 ============ -->
+<section class="section">
+  <div class="section-title">⚡ AI 模型引擎</div>
+  <div class="section-sub">接入多个业界顶级模型，满足不同场景需求</div>
+  <div class="model-row">
+    <div class="model-card">
+      <div class="mc-icon">🎬</div>
+      <div class="mc-name">Seedance 2.0</div>
+      <div class="mc-desc">字节豆包旗舰视频生成模型，支持 480p~1080p，电影级画质</div>
+      <div class="mc-tags"><span class="mc-tag">文生视频</span><span class="mc-tag">图生视频</span><span class="mc-tag">1080p</span></div>
+    </div>
+    <div class="model-card">
+      <div class="mc-icon">🎥</div>
+      <div class="mc-name">Seedance 1.5 Pro</div>
+      <div class="mc-desc">豆包专业级视频生成，快速模式支持，适合批量创作</div>
+      <div class="mc-tags"><span class="mc-tag">文生视频</span><span class="mc-tag">快速模式</span><span class="mc-tag">720p</span></div>
+    </div>
+    <div class="model-card">
+      <div class="mc-icon">🤖</div>
+      <div class="mc-name">DeepSeek-V3</div>
+      <div class="mc-desc">深度求索文本大模型，强大的脚本创作和提示词优化能力</div>
+      <div class="mc-tags"><span class="mc-tag">文本生成</span><span class="mc-tag">脚本创作</span><span class="mc-tag">提示词优化</span></div>
+    </div>
+    <div class="model-card">
+      <div class="mc-icon">🧠</div>
+      <div class="mc-name">GLM-5.0 / Kimi-K2.5</div>
+      <div class="mc-desc">智谱AI & 月之暗面，多场景文本能力，创意灵感源源不断</div>
+      <div class="mc-tags"><span class="mc-tag">文本生成</span><span class="mc-tag">创意灵感</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 作品广场预览 ============ -->
+<section class="section" style="background:var(--bg2);max-width:100%;">
+  <div class="section-title">🎬 作品广场</div>
+  <div class="section-sub">由云帧创作者生成的精彩视频</div>
+  <div class="video-grid" id="showcase-preview" style="max-width:1200px;margin:0 auto;">
+    <div style="color:var(--text3);text-align:center;grid-column:1/-1;padding:40px;">加载中...</div>
+  </div>
+  <div style="text-align:center;margin-top:30px;">
+    <a href="/showcase" class="btn btn-outline">查看全部作品 →</a>
+  </div>
+</section>
+
+<!-- ============ 底部 ============ -->
+<footer class="footer">© 2026 云帧 AI — 企业级智能视频创作平台</footer>
+
+<script>
+// Load stats
+fetch('/api/showcase').then(r=>r.json()).then(d=>{
+  if(d.code===0){
+    document.getElementById('home-videos').textContent=d.videos.length;
+  }
+}).catch(()=>{});
+fetch('/api/site-stats').then(r=>r.json()).then(d=>{
+  if(d.code===0) document.getElementById('home-users').textContent=d.stats.total_users;
+}).catch(()=>{});
+
+// Load showcase preview
+fetch('/api/showcase').then(r=>r.json()).then(d=>{
+  var grid=document.getElementById('showcase-preview');
+  if(!d.videos||d.videos.length===0){
+    grid.innerHTML='<div style="color:var(--text3);text-align:center;grid-column:1/-1;padding:60px;">还没有作品，<a href="/dashboard" style="color:var(--accent2);">开始创作第一个视频</a></div>';
+    return;
+  }
+  grid.innerHTML=d.videos.slice(0,6).map(function(v){
+    return '<div class="video-card" onclick="location.href=\'/detail?id='+v.id+'\'" style="cursor:pointer;"><video src="'+v.url+'" preload="metadata"></video><div class="v-info"><div class="v-name">'+esc(v.name)+'</div><div class="v-meta">'+v.created_at+' · '+esc(v.owner_name)+'</div></div></div>';
+  }).join('');
+}).catch(function(){});
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>

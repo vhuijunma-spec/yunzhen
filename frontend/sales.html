@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>销售员工作台 — 云帧</title>
+<style>
+:root { --bg:#0a0a0f;--bg2:#111118;--card:#181820;--border:#25252d;--text:#e8e8ed;--text2:#9898a8;--text3:#5c5c6e;--accent:#6366f1;--accent2:#818cf8;--green:#22c55e;--red:#ef4444;--orange:#f59e0b;--radius:12px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); display:flex; min-height:100vh; }
+
+/* 侧边栏 */
+.sidebar { width:240px; min-width:240px; background:var(--bg2); border-right:1px solid var(--border); display:flex; flex-direction:column; height:100vh; position:sticky; top:0; }
+.sidebar-header { padding:24px 20px; border-bottom:1px solid var(--border); }
+.sidebar-header .logo { font-size:18px; font-weight:700; } .sidebar-header .logo span { color:var(--accent2); }
+.sidebar-header .badge { font-size:11px; color:var(--orange); margin-top:4px; }
+.sidebar-info { padding:16px 20px; border-bottom:1px solid var(--border); }
+.sidebar-info .si-row { display:flex; justify-content:space-between; font-size:13px; margin-bottom:6px; }
+.si-label { color:var(--text3); } .si-value { color:var(--text); font-weight:600; }
+.sidebar-footer { padding:16px 20px; border-top:1px solid var(--border); font-size:12px; color:var(--text3); margin-top:auto; }
+
+/* 主区 */
+.main { flex:1; display:flex; flex-direction:column; height:100vh; overflow-y:auto; }
+.topbar { padding:14px 28px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; position:sticky; top:0; background:var(--bg); z-index:10; }
+.topbar .greeting { font-size:15px; }
+.topbar .user { display:flex; align-items:center; gap:10px; font-size:14px; }
+.topbar .avatar { width:34px; height:34px; border-radius:50%; background:var(--orange); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; }
+.content { padding:28px; max-width:1500px; width:100%; margin:0 auto; }
+
+.stat-row { display:flex; gap:14px; margin-bottom:20px; flex-wrap:wrap; }
+.stat-card { flex:1; min-width:170px; background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:18px 22px; }
+.stat-card .s-num { font-size:26px; font-weight:800; } .stat-card .s-num.green{color:var(--green);} .stat-card .s-num.orange{color:var(--orange);}
+.stat-card .s-label { font-size:11px; color:var(--text3); margin-top:3px; text-transform:uppercase; letter-spacing:1px; }
+
+.btn { padding:9px 20px; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; border:none; transition:.2s; }
+.btn-accent { background:var(--accent); color:#fff; } .btn-accent:hover { background:var(--accent2); }
+.btn-accent:disabled { background:var(--border); color:var(--text3); cursor:not-allowed; }
+.btn-danger { background:transparent; border:1px solid var(--red); color:var(--red); }
+.btn-danger:hover { background:var(--red); color:#fff; }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text2); }
+.btn-outline:hover { border-color:var(--text3); color:var(--text); }
+.btn-sm { font-size:12px; padding:6px 14px; }
+
+/* 客户详情面板 */
+.detail-panel { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:28px; margin-bottom:20px; display:none; }
+.detail-panel.show { display:block; }
+.detail-panel .dp-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+.detail-panel .dp-title { font-size:18px; font-weight:700; }
+.detail-panel .dp-title .customer-name { color:var(--accent2); }
+.detail-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:16px; }
+.detail-field { display:flex; flex-direction:column; gap:5px; }
+.detail-field label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:.5px; }
+.detail-field input,.detail-field select {
+  background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:9px 12px;
+  color:var(--text); font-size:14px; outline:none; transition:.15s; width:100%;
+}
+.detail-field input:focus,.detail-field select:focus { border-color:var(--accent); }
+.detail-field input.changed,.detail-field select.changed { border-color:var(--orange); background:rgba(245,158,11,0.06); }
+.detail-field input[readonly],.detail-field select[disabled] { background:var(--bg2); color:var(--text2); cursor:default; }
+.detail-field .unit { font-size:12px; color:var(--text3); margin-top:2px; }
+.detail-btn-row { display:flex; gap:10px; margin-top:20px; align-items:center; }
+.confirm-hint { font-size:12px; color:var(--text3); }
+
+/* 充值区 */
+.recharge-section { margin-top:24px; padding-top:24px; border-top:1px solid var(--border); }
+.recharge-section .rs-title { font-size:15px; font-weight:600; margin-bottom:14px; }
+.recharge-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.recharge-row input { background:var(--bg); border:1px solid var(--border); border-radius:6px; padding:9px 12px; color:var(--text); font-size:14px; outline:none; width:140px; }
+.recharge-row input:focus { border-color:var(--accent); }
+.recharge-history { margin-top:16px; }
+.recharge-history table { width:100%; border-collapse:collapse; font-size:13px; }
+.recharge-history th { text-align:left; padding:8px 10px; font-size:11px; color:var(--text3); border-bottom:1px solid var(--border); }
+.recharge-history td { padding:8px 10px; border-bottom:1px solid var(--border); color:var(--text2); }
+
+/* 搜索 + 表格 */
+.search-bar { display:flex; gap:10px; margin-bottom:16px; align-items:center; }
+.search-bar input { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:10px 14px; color:var(--text); font-size:14px; outline:none; width:260px; }
+.search-bar input:focus { border-color:var(--accent); }
+.table-wrap { overflow-x:auto; border-radius:var(--radius); border:1px solid var(--border); }
+table.cust-table { width:100%; border-collapse:collapse; min-width:1000px; }
+.cust-table th { background:var(--bg2); padding:10px 12px; text-align:left; font-size:11px; color:var(--text3); text-transform:uppercase; border-bottom:1px solid var(--border); white-space:nowrap; }
+.cust-table td { padding:9px 12px; font-size:13px; border-bottom:1px solid var(--border); cursor:pointer; }
+.cust-table tr:hover td { background:var(--card); }
+.cust-table tr.selected td { background:rgba(99,102,241,0.1); }
+.no-data { color:var(--text3); text-align:center; padding:40px; }
+
+/* 模态 */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index:1000; display:none; }
+.modal-overlay.show { display:flex; }
+.modal-box { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); padding:32px; width:500px; max-width:90vw; }
+.modal-box h3 { font-size:18px; margin-bottom:8px; }
+.modal-box .modal-sub { font-size:13px; color:var(--text2); margin-bottom:20px; }
+.modal-box .change-list { background:var(--bg); border-radius:8px; padding:16px; margin-bottom:20px; }
+.modal-box .change-item { font-size:14px; padding:6px 0; border-bottom:1px solid var(--border); }
+.modal-box .change-item:last-child { border-bottom:none; }
+.modal-box .change-item .field-label { color:var(--text3); font-size:11px; }
+.modal-box .change-item .old-val { color:var(--red); text-decoration:line-through; margin:0 4px; }
+.modal-box .change-item .arrow { color:var(--text3); margin:0 6px; }
+.modal-box .change-item .new-val { color:var(--green); font-weight:600; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; }
+
+.toast { position:fixed; bottom:28px; right:28px; background:var(--card); border:1px solid var(--border); border-radius:8px; padding:14px 20px; font-size:14px; z-index:2000; animation:slideUp .3s; max-width:380px; }
+.toast.success { border-left:3px solid var(--green); } .toast.error { border-left:3px solid var(--red); }
+@keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header"><div class="logo">云帧</div><div class="badge">销售员工作台</div></div>
+  <div class="sidebar-info">
+    <div class="si-row"><span class="si-label">姓名</span><span class="si-value" id="sp-name">-</span></div>
+    <div class="si-row"><span class="si-label">销售员码</span><span class="si-value" id="sp-code">-</span></div>
+  </div>
+  <div class="sidebar-footer"><span id="sidebar-user"></span></div>
+</aside>
+
+<main class="main">
+  <div class="topbar">
+    <div class="greeting" id="greeting">欢迎回来</div>
+    <div class="user"><span id="top-username"></span><div class="avatar" id="top-avatar"></div><button class="btn btn-outline btn-sm" onclick="doLogout()">退出</button></div>
+  </div>
+  <div class="content">
+
+    <!-- 统计 -->
+    <div class="stat-row">
+      <div class="stat-card"><div class="s-num green" id="stat-count">0</div><div class="s-label">我的客户</div></div>
+      <div class="stat-card"><div class="s-num orange" id="stat-deposits">¥0.00</div><div class="s-label">客户累计充值</div></div>
+    </div>
+
+    <!-- ======== 客户详情面板 ======== -->
+    <div class="detail-panel" id="detail-panel">
+      <div class="dp-header">
+        <div class="dp-title">📋 <span class="customer-name" id="dp-customer-name"></span><span class="sub-tag" id="dp-sub-tag" style="display:none;font-size:11px;color:var(--accent2);margin-left:8px;background:rgba(99,102,241,0.12);padding:2px 8px;border-radius:10px;">子账号</span><span id="dp-back-parent" style="display:none;margin-left:10px;"><button class="btn btn-outline btn-sm" onclick="backToParent()" style="font-size:11px;padding:3px 10px;">← 返回主账号</button></span></div>
+        <button class="btn btn-outline btn-sm" onclick="closeDetail()">✕ 关闭</button>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-field"><label>用户名</label><input type="text" id="dp-username" readonly></div>
+        <div class="detail-field"><label>邮箱</label><input type="email" id="dp-email" data-field="email" oninput="onDetailChange(this)" onkeydown="onDetailKey(event)"></div>
+        <div class="detail-field"><label>手机号</label><input type="tel" id="dp-phone" data-field="phone" oninput="onDetailChange(this)" onkeydown="onDetailKey(event)"></div>
+        <div class="detail-field"><label>状态</label>
+          <select id="dp-status" data-field="status" onchange="onDetailChange(this)" onkeydown="onDetailKey(event)">
+            <option value="pending">待审核</option><option value="approved">已审核</option>
+          </select>
+        </div>
+        <div class="detail-field"><label>计费单价</label><input type="number" id="dp-rate" data-field="rate_per_second" step="0.01" min="0" oninput="onDetailChange(this)" onkeydown="onDetailKey(event)"><div class="unit">元 / 秒</div></div>
+        <div class="detail-field"><label>余额</label><input type="text" id="dp-balance" readonly></div>
+        <div class="detail-field"><label>累计充值</label><input type="text" id="dp-deposit" readonly></div>
+        <div class="detail-field"><label>总使用秒数</label><input type="text" id="dp-total-seconds" readonly><div class="unit">各渠道合计</div></div>
+        <div class="detail-field"><label>剩余金额</label><input type="text" id="dp-remaining-amount" readonly></div>
+        <div class="detail-field"><label>剩余秒数</label><input type="text" id="dp-remaining-seconds" readonly><div class="unit">按当前单价估算</div></div>
+      </div>
+      <!-- 渠道独立一行 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+        <div class="detail-field"><label>渠道</label>
+          <select id="dp-channel" data-field="channel_id" onchange="onDetailChange(this)" onkeydown="onDetailKey(event)"><option value="">未分配</option></select>
+        </div>
+        <div class="detail-field"><label>当前渠道使用秒数</label><input type="text" id="dp-channel-seconds" readonly></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;">
+        <div class="detail-field"><label>积分</label><input type="text" id="dp-points" readonly></div>
+        <div class="detail-field"><label>注册时间</label><input type="text" id="dp-created" readonly></div>
+      </div>
+      <div class="detail-btn-row" id="detail-btn-row" style="display:none;">
+        <button class="btn btn-accent" id="btn-detail-confirm" onclick="showDetailConfirm()">✓ 确定修改</button>
+        <span class="confirm-hint" id="detail-hint"></span>
+      </div>
+
+      <!-- 充值 -->
+      <div class="recharge-section">
+        <div class="rs-title">💳 为客户充值</div>
+        <div class="recharge-row">
+          <input type="number" id="recharge-amount" placeholder="金额（元）" step="0.01" min="0.01">
+          <input type="text" id="recharge-desc" placeholder="备注（可选）" style="width:200px;">
+          <button class="btn btn-accent" onclick="doRecharge()">确认充值</button>
+        </div>
+        <div class="recharge-history" id="recharge-history"></div>
+      </div>
+
+      <!-- 模型开关 -->
+      <div class="recharge-section" style="border-top-color:var(--green);">
+        <div class="rs-title">🔧 可用模型开关</div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:12px;">开关影响客户在页面上能否看到该模型，灰色=禁用，亮色=启用</div>
+        <div id="model-toggle-list" style="display:flex;flex-wrap:wrap;gap:8px;">请先选择客户</div>
+      </div>
+
+      <!-- 子账号 -->
+      <div class="recharge-section" style="border-top-color:var(--accent);">
+        <div class="rs-title">👥 子账号列表（<span id="sub-count">0</span>个）</div>
+        <div class="sub-table-wrap" style="margin-top:10px;">
+          <table class="cust-table" style="min-width:auto;">
+            <thead><tr><th>用户名</th><th>邮箱</th><th>手机号</th><th>状态</th><th>已用积分</th><th>余额</th><th>注册时间</th></tr></thead>
+            <tbody id="sub-tbody"><tr><td colspan="7" style="color:var(--text3);text-align:center;">暂无子账号</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======== 客户列表 ======== -->
+    <div class="search-bar">
+      <input type="text" id="search-input" placeholder="搜索客户用户名/邮箱/手机号..." oninput="filterCustomers()">
+      <span style="font-size:12px;color:var(--text3);">点击行查看客户详情</span>
+    </div>
+    <div class="table-wrap">
+      <table class="cust-table">
+        <thead><tr><th>用户名</th><th>邮箱</th><th>手机号</th><th>状态</th><th>子账号</th><th>渠道</th><th>余额</th><th>累计充值</th><th>积分</th><th>注册时间</th></tr></thead>
+        <tbody id="customer-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- 确认对话框 -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-box">
+    <h3>确认修改</h3><p class="modal-sub">确定要修改以下内容吗？</p>
+    <div class="change-list" id="change-list"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="cancelChanges()">取消</button>
+      <button class="btn btn-accent" onclick="confirmChanges()">确定修改</button>
+    </div>
+  </div>
+</div>
+<div id="toast-container"></div>
+
+<script>
+let currentUser=null, customers=[], channels=[], selectedCustomerId=null, currentParentId=null;
+let detailOriginal={}, detailDirty={};
+let subAccountsCache = {};  // {parentId: [subData, ...]}
+const statusLabels={approved:'已审核', pending:'待审核'}, fieldLabels={email:'邮箱', phone:'手机号', status:'状态', rate_per_second:'计费单价', channel_id:'渠道'};
+
+fetch('/api/me').then(r=>r.json()).then(d=>{
+  if(d.code!==0){location.href='/login';return}
+  currentUser=d.user;
+  if(d.user.role!=='salesperson'){location.href='/dashboard';return}
+  document.getElementById('greeting').textContent=`欢迎回来，${d.user.username}`;
+  document.getElementById('top-username').textContent=d.user.username;
+  document.getElementById('top-avatar').textContent=d.user.username[0].toUpperCase();
+  document.getElementById('sidebar-user').textContent=`${d.user.username} · 销售员`;
+  loadChannels().then(()=>loadDashboard());
+}).catch(()=>{location.href='/login'});
+
+function doLogout(){fetch('/api/logout',{method:'POST'}).then(()=>{location.href='/';});}
+
+async function loadChannels(){
+  try{ const r=await fetch('/api/channels/all'); const d=await r.json(); channels=d.channels||[]; }catch(e){}
+}
+
+async function loadDashboard(){
+  try{
+    const r=await fetch('/api/salesperson/dashboard'); const d=await r.json();
+    if(d.code!==0){toast(d.message,'error');return}
+    document.getElementById('sp-name').textContent=d.salesperson.name;
+    document.getElementById('sp-code').textContent=d.salesperson.code;
+    document.getElementById('stat-count').textContent=d.stats.customer_count;
+    document.getElementById('stat-deposits').textContent='¥'+d.stats.total_deposits.toFixed(2);
+    customers=d.customers; renderTable();
+  }catch(e){toast('加载失败: '+e.message,'error');}
+}
+
+function renderTable(){
+  const search=document.getElementById('search-input').value.toLowerCase();
+  const filtered=customers.filter(c=>{
+    if(!search) return true;
+    return (c.username||'').toLowerCase().includes(search)||(c.email||'').toLowerCase().includes(search)||(c.phone||'').toLowerCase().includes(search);
+  });
+  const tbody=document.getElementById('customer-tbody');
+  if(filtered.length===0){tbody.innerHTML='<tr><td colspan="10" class="no-data">暂无客户</td></tr>';return;}
+  tbody.innerHTML=filtered.map(c=>`
+    <tr class="${(selectedCustomerId===c.id||currentParentId===c.id)?'selected':''}" onclick="selectCustomer(${c.id})">
+      <td>${esc(c.username)}</td><td>${esc(c.email||'')}</td><td>${esc(c.phone||'')}</td>
+      <td>${c.status==='approved'?'已审核':'待审核'}</td>
+      <td style="font-weight:600;color:var(--accent2);">${c.sub_count||0}个子账号</td>
+      <td>${esc(c.channel_name||'未分配')}</td>
+      <td>¥${(c.balance||0).toFixed(2)}</td>
+      <td>¥${(c.total_deposit||0).toFixed(2)}</td>
+      <td>${c.points||0}</td>
+      <td>${(c.created_at||'').slice(0,10)}</td>
+    </tr>`).join('');
+}
+
+// ===== 填充详情面板（主账号和子账号共用） =====
+function fillDetailPanel(data, isSub){
+  document.getElementById('detail-panel').classList.add('show');
+  document.getElementById('dp-customer-name').textContent=data.username;
+  document.getElementById('dp-sub-tag').style.display=isSub?'inline':'none';
+  document.getElementById('dp-back-parent').style.display=isSub?'inline':'none';
+  document.getElementById('dp-username').value=data.username||'';
+  document.getElementById('dp-email').value=data.email||'';
+  document.getElementById('dp-phone').value=data.phone||'';
+  document.getElementById('dp-status').value=data.status||'pending';
+  document.getElementById('dp-rate').value=data.rate_per_second??2.30;
+  document.getElementById('dp-balance').value='¥'+(data.balance||0).toFixed(2);
+  document.getElementById('dp-deposit').value='¥'+(data.total_deposit||0).toFixed(2);
+  document.getElementById('dp-points').value=data.points||0;
+  document.getElementById('dp-created').value=(data.created_at||'').slice(0,10);
+
+  const chSel=document.getElementById('dp-channel');
+  chSel.innerHTML='<option value="">未分配</option>'+channels.map(ch=>'<option value="'+ch.id+'" '+((data.channel_id||'')==ch.id?'selected':'')+'>'+ch.name+'</option>').join('');
+
+  detailOriginal={email:data.email||'', phone:data.phone||'', status:data.status||'pending', rate_per_second:data.rate_per_second??2.30, channel_id:(data.channel_id||'')};
+  detailDirty={};
+  document.getElementById('detail-btn-row').style.display='none';
+  document.querySelectorAll('#detail-panel input[data-field], #detail-panel select[data-field]').forEach(el=>el.classList.remove('changed'));
+  loadRecharges(selectedCustomerId);
+  loadUsage(selectedCustomerId);
+  loadCustomerModels(selectedCustomerId);
+  if(!isSub) loadSubAccountsForSales(selectedCustomerId);
+}
+
+// ===== 选中客户 =====
+function selectCustomer(cid){
+  selectedCustomerId=cid; currentParentId=null;
+  const c=customers.find(x=>x.id===cid); if(!c) return;
+  fillDetailPanel(c, false);
+  renderTable();
+}
+
+// ===== 选中子账号 =====
+function selectSubAccount(sid){
+  selectedCustomerId=sid;
+  // 从缓存中查找
+  let data=null;
+  for(const [parentId, subs] of Object.entries(subAccountsCache)){
+    const found=subs.find(s=>s.id===sid);
+    if(found){ data=found; currentParentId=parseInt(parentId); break; }
+  }
+  if(!data) return;
+  fillDetailPanel(data, true);
+  renderTable();
+}
+
+// ===== 返回主账号 =====
+function backToParent(){
+  if(currentParentId){ selectCustomer(currentParentId); }
+}
+
+async function loadUsage(cid){
+  try{
+    const r=await fetch(`/api/salesperson/customer/${cid}/usage`); const d=await r.json();
+    if(d.code!==0) return;
+    document.getElementById('dp-total-seconds').value=d.total_seconds.toFixed(2)+' 秒';
+    document.getElementById('dp-remaining-amount').value='¥'+d.balance.toFixed(2);
+    document.getElementById('dp-remaining-seconds').value=d.remaining_seconds.toFixed(2)+' 秒';
+    // 当前渠道秒数
+    const chId=parseInt(document.getElementById('dp-channel').value)||0;
+    const cur=d.channels.find(x=>x.channel_id===chId);
+    document.getElementById('dp-channel-seconds').value=(cur?cur.total_seconds.toFixed(2):'0.00')+' 秒';
+  }catch(e){}
+}
+
+function closeDetail(){ selectedCustomerId=null; currentParentId=null; document.getElementById('detail-panel').classList.remove('show'); document.getElementById('dp-sub-tag').style.display='none'; document.getElementById('dp-back-parent').style.display='none'; detailDirty={}; renderTable(); }
+
+// ===== 详情编辑 =====
+function onDetailChange(el){
+  const field=el.dataset.field; let newVal=el.value;
+  if(field==='rate_per_second') newVal=parseFloat(newVal)||2.30;
+  const orig=detailOriginal[field];
+  const origCmp=field==='rate_per_second'?parseFloat(orig||2.30):String(orig||'');
+  const newCmp =field==='rate_per_second'?parseFloat(newVal):String(newVal);
+
+  if(String(newCmp)!==String(origCmp)){ detailDirty[field]=newVal; el.classList.add('changed'); }
+  else { delete detailDirty[field]; el.classList.remove('changed'); }
+  updateDetailBtn();
+}
+function onDetailKey(e){ if(e.key==='Enter'){ e.preventDefault(); showDetailConfirm(); } }
+function updateDetailBtn(){
+  const has=Object.keys(detailDirty).length>0;
+  document.getElementById('detail-btn-row').style.display=has?'flex':'none';
+  document.getElementById('detail-hint').textContent=has?`已修改 ${Object.keys(detailDirty).length} 个字段`:'';
+
+}
+
+// ===== 确认对话框 =====
+function showDetailConfirm(){
+  const changes=[];
+  const cname=document.getElementById('dp-username').value;
+  for(const [f,v] of Object.entries(detailDirty)){
+    const orig=detailOriginal[f];
+    const oldV=f==='status'?(statusLabels[orig]||orig):String(orig||'');
+    const newV=f==='status'?(statusLabels[v]||v):String(v);
+    if(f==='channel_id'){
+      const ch=channels.find(x=>x.id==parseInt(v));
+      changes.push({field:f, fieldLabel:fieldLabels[f], oldVal:oldV?((channels.find(x=>x.id==parseInt(orig))||{}).name||orig):'未分配', newVal:(ch||{}).name||'未分配'});
+    } else {
+      changes.push({field:f, fieldLabel:fieldLabels[f], oldVal:oldV, newVal:newV});
+    }
+  }
+  document.getElementById('change-list').innerHTML=changes.map(ch=>`<div class="change-item"><div class="field-label">${esc(cname)} · ${ch.fieldLabel}</div><span class="old-val">${esc(ch.oldVal)}</span><span class="arrow">→</span><span class="new-val">${esc(ch.newVal)}</span></div>`).join('');
+  document.getElementById('modal-overlay').classList.add('show');
+}
+function cancelChanges(){ document.getElementById('modal-overlay').classList.remove('show'); }
+async function confirmChanges(){
+  document.getElementById('modal-overlay').classList.remove('show');
+  try{
+    const r=await fetch(`/api/salesperson/customer/${selectedCustomerId}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({changes:detailDirty})});
+    const d=await r.json();
+    if(d.code===0){ toast(`已修改 ${d.applied.length} 项`,'success'); detailDirty={}; document.getElementById('detail-btn-row').style.display='none'; loadDashboard(); loadUsage(selectedCustomerId); loadSubAccountsForSales(selectedCustomerId); if(d.applied.indexOf('channel_id')!==-1) loadCustomerModels(selectedCustomerId); }
+    else toast(d.message,'error');
+  }catch(e){toast('操作失败','error');}
+}
+
+// ===== 充值 =====
+async function doRecharge(){
+  if(!selectedCustomerId) return toast('请先选择一个客户','error');
+  const amt=parseFloat(document.getElementById('recharge-amount').value);
+  const desc=document.getElementById('recharge-desc').value.trim();
+  if(!amt||amt<=0) return toast('请输入有效充值金额','error');
+  try{
+    const r=await fetch(`/api/salesperson/customer/${selectedCustomerId}/recharge`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({amount:amt,description:desc})});
+    const d=await r.json();
+    if(d.code===0){ toast(`充值 ¥${amt.toFixed(2)} 成功！余额 ¥${d.balance_after.toFixed(2)}`,'success'); document.getElementById('recharge-amount').value=''; document.getElementById('recharge-desc').value=''; loadDashboard(); loadRecharges(selectedCustomerId); loadUsage(selectedCustomerId); }
+    else toast(d.message,'error');
+  }catch(e){toast('充值失败','error');}
+}
+
+async function loadRecharges(cid){
+  try{
+    const r=await fetch(`/api/salesperson/customer/${cid}/recharges`); const d=await r.json();
+    const history=document.getElementById('recharge-history');
+    if(!d.recharges||d.recharges.length===0){ history.innerHTML='<div style="color:var(--text3);font-size:13px;margin-top:10px;">暂无充值记录</div>'; return; }
+    history.innerHTML=`<table><thead><tr><th>时间</th><th>金额</th><th>充值前</th><th>充值后</th><th>操作人</th><th>备注</th></tr></thead><tbody>`+
+      d.recharges.map(r=>`<tr><td>${r.created_at}</td><td style="color:var(--green);font-weight:600;">+¥${r.amount.toFixed(2)}</td><td>¥${r.balance_before.toFixed(2)}</td><td>¥${r.balance_after.toFixed(2)}</td><td>${esc(r.created_by_name)}</td><td>${esc(r.description||'')}</td></tr>`).join('')+'</tbody></table>';
+  }catch(e){}
+}
+
+async function loadSubAccountsForSales(cid){
+  try{
+    const r=await fetch(`/api/salesperson/customer/${cid}/sub-accounts`); const d=await r.json();
+    subAccountsCache[cid]=d.sub_accounts||[];
+    document.getElementById('sub-count').textContent=d.sub_accounts?d.sub_accounts.length:0;
+    const tbody=document.getElementById('sub-tbody');
+    if(!d.sub_accounts||d.sub_accounts.length===0){ tbody.innerHTML='<tr><td colspan="7" style="color:var(--text3);text-align:center;">暂无子账号</td></tr>'; return; }
+    tbody.innerHTML=d.sub_accounts.map(s=>'<tr class="'+(selectedCustomerId===s.id?'selected':'')+'" onclick="selectSubAccount('+s.id+')" style="cursor:pointer;"><td>'+esc(s.username)+'</td><td>'+esc(s.email||'')+'</td><td>'+esc(s.phone||'')+'</td><td>'+(s.status==='approved'?'已审核':'待审核')+'</td><td style="color:var(--orange);font-weight:600;">'+(s.total_points_used||0)+'</td><td>¥'+(s.balance||0).toFixed(2)+'</td><td>'+(s.created_at||'').slice(0,10)+'</td></tr>').join('');
+  }catch(e){}
+}
+
+async function loadCustomerModels(cid){
+  var list = document.getElementById('model-toggle-list');
+  try{
+    var r = await fetch('/api/salesperson/customer/' + cid + '/models');
+    var d = await r.json();
+    if (!d.models || d.models.length === 0) {
+      list.innerHTML = '<span style="color:var(--text3);font-size:13px;">该客户当前渠道无定价模型</span>';
+      return;
+    }
+    list.innerHTML = d.models.map(function(m){
+      var on = m.enabled === 1;
+      return '<div class="model-toggle-chip" style="cursor:pointer;padding:6px 14px;border-radius:16px;font-size:12px;border:1px solid '+(on?'var(--green)':'var(--border)')+';background:'+(on?'rgba(34,197,94,0.1)':'var(--bg)')+';color:'+(on?'var(--green)':'var(--text3)')+';" onclick="toggleModel('+cid+',\''+esc(m.model_name)+'\',this)" data-model="'+esc(m.model_name)+'">'+esc(m.model_name)+' ('+m.points_per_second+'pts/s)</div>';
+    }).join('');
+  }catch(e){ list.innerHTML = '<span style="color:var(--text3);">加载失败</span>'; }
+}
+
+async function toggleModel(cid, modelName, el){
+  try{
+    var r = await fetch('/api/salesperson/customer/' + cid + '/models/' + encodeURIComponent(modelName) + '/toggle', {method:'PUT'});
+    var d = await r.json();
+    if (d.code === 0) {
+      var on = d.enabled;
+      el.style.borderColor = on ? 'var(--green)' : 'var(--border)';
+      el.style.background = on ? 'rgba(34,197,94,0.1)' : 'var(--bg)';
+      el.style.color = on ? 'var(--green)' : 'var(--text3)';
+      toast(modelName + ' ' + (on ? '已启用' : '已禁用'), 'success');
+    } else {
+      toast(d.message, 'error');
+    }
+  }catch(e){ toast('操作失败', 'error'); }
+}
+
+function filterCustomers(){ renderTable(); }
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type){ const el=document.createElement('div'); el.className='toast '+(type||''); el.textContent=msg; document.getElementById('toast-container').appendChild(el); setTimeout(()=>{el.style.opacity='0';el.style.transition='opacity .3s';},3000); setTimeout(()=>el.remove(),3500); }
+</script>
+</body>
+</html>

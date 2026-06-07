@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作品广场 — 云帧 AI</title>
+<style>
+:root { --bg:#0a0a0f;--bg2:#111118;--card:#181820;--border:#25252d;--text:#e8e8ed;--text2:#9898a8;--text3:#5c5c6e;--accent:#6366f1;--accent2:#818cf8;--orange:#f59e0b;--green:#22c55e;--radius:16px; }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+.navbar { display:flex; justify-content:space-between; align-items:center; padding:0 40px; height:64px; background:rgba(10,10,15,0.92); backdrop-filter:blur(12px); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:100; }
+.nav-logo { font-size:22px; font-weight:800; }
+.nav-logo span { color:var(--accent2); }
+.nav-links { display:flex; gap:10px; align-items:center; }
+.nav-links a { color:var(--text2); text-decoration:none; font-size:14px; padding:8px 16px; border-radius:8px; transition:.2s; }
+.nav-links a:hover { color:var(--text); background:var(--card); }
+.nav-links .btn-nav { background:var(--accent); color:#fff; font-weight:600; }
+
+/* Hero strip */
+.showcase-hero { padding:60px 40px 40px; text-align:center; }
+.showcase-hero h1 { font-size:36px; font-weight:900; }
+.showcase-hero h1 span { background:linear-gradient(135deg,var(--accent2),var(--orange)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.showcase-hero p { color:var(--text2); margin-top:10px; }
+
+/* Filters */
+.filter-bar { display:flex; justify-content:center; gap:8px; padding:0 40px 30px; flex-wrap:wrap; }
+.filter-btn { padding:8px 18px; border-radius:20px; font-size:13px; cursor:pointer; border:1px solid var(--border); background:transparent; color:var(--text2); transition:.2s; }
+.filter-btn:hover, .filter-btn.active { background:rgba(99,102,241,0.12); border-color:var(--accent2); color:var(--accent2); }
+
+/* Grid */
+.container { max-width:1300px; margin:0 auto; padding:0 20px 60px; }
+.video-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:20px; }
+.video-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; transition:.3s; cursor:pointer; }
+.video-card:hover { border-color:var(--accent); transform:translateY(-4px); box-shadow:0 12px 40px rgba(0,0,0,0.4); }
+.video-card video { width:100%; height:220px; object-fit:cover; background:#000; }
+.video-card .v-info { padding:16px; }
+.video-card .v-name { font-size:15px; font-weight:600; margin-bottom:4px; }
+.video-card .v-meta { font-size:12px; color:var(--text3); display:flex; justify-content:space-between; }
+.video-card .v-author { color:var(--accent2); }
+
+/* Video Overlay */
+.overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:1000; align-items:center; justify-content:center; }
+.overlay.show { display:flex; }
+.overlay video { max-width:90%; max-height:85%; border-radius:12px; }
+.overlay .close { position:absolute; top:20px; right:30px; font-size:36px; color:#fff; cursor:pointer; background:none; border:none; }
+.overlay .ov-info { position:absolute; bottom:30px; left:50%; transform:translateX(-50%); color:#fff; font-size:15px; text-align:center; }
+
+.empty-state { text-align:center; padding:80px 20px; color:var(--text3); }
+.empty-state .icon { font-size:64px; margin-bottom:16px; }
+.empty-state a { color:var(--accent2); }
+
+.footer { border-top:1px solid var(--border); padding:30px; text-align:center; color:var(--text3); font-size:13px; }
+
+@media (max-width:768px) {
+  .video-grid { grid-template-columns:1fr; }
+  .showcase-hero h1 { font-size:28px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-logo"><a href="/" style="color:inherit;text-decoration:none;">云帧 <span>AI</span></a></div>
+  <div class="nav-links">
+    <a href="/">首页</a>
+    <a href="/dashboard">工作台</a>
+    <a href="/login">登录</a>
+    <a href="/dashboard" class="btn-nav">开始创作</a>
+  </div>
+</nav>
+
+<div class="showcase-hero">
+  <h1>🎬 <span>作品广场</span></h1>
+  <p>发现 AI 创作者的精彩视频，获取灵感</p>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-btn active" data-cat="all" onclick="filterCat('all',this)">全部作品</button>
+  <button class="filter-btn" data-cat="短剧" onclick="filterCat('短剧',this)">📺 短剧</button>
+  <button class="filter-btn" data-cat="解说" onclick="filterCat('解说',this)">🎙️ 解说</button>
+  <button class="filter-btn" data-cat="动画" onclick="filterCat('动画',this)">🎨 动画</button>
+  <button class="filter-btn" data-cat="广告" onclick="filterCat('广告',this)">📢 广告</button>
+  <button class="filter-btn" data-cat="创意" onclick="filterCat('创意',this)">💡 创意</button>
+  <button class="filter-btn" data-cat="风景" onclick="filterCat('风景',this)">🌄 风景</button>
+  <button class="filter-btn" data-cat="人物" onclick="filterCat('人物',this)">👤 人物</button>
+  <button class="filter-btn" data-cat="动物" onclick="filterCat('动物',this)">🐾 动物</button>
+</div>
+
+<div class="container">
+  <div class="video-grid" id="video-grid">
+    <div class="empty-state"><div class="icon">🎬</div>加载中...</div>
+  </div>
+</div>
+
+<div class="overlay" id="video-overlay" onclick="closeOverlay()">
+  <button class="close">&times;</button>
+  <video id="overlay-video" controls autoplay></video>
+  <div class="ov-info" id="overlay-info"></div>
+</div>
+
+<footer class="footer">© 2026 云帧 AI — 灵感来自每一个创作者</footer>
+
+<script>
+var allVideos=[];
+var currentCat='all';
+
+fetch('/api/showcase').then(r=>r.json()).then(d=>{
+  allVideos=d.videos||[];
+  renderVideos();
+}).catch(function(){
+  document.getElementById('video-grid').innerHTML='<div class="empty-state"><div class="icon">🎬</div><p>还没有作品</p><a href="/dashboard">去创作第一个视频 →</a></div>';
+});
+
+function filterCat(cat,btn){
+  currentCat=cat;
+  document.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+  btn.classList.add('active');
+  renderVideos();
+}
+
+function renderVideos(){
+  var videos=allVideos.slice();
+  if(currentCat!=='all') videos=videos.filter(function(v){return (v.category||'创意')===currentCat;});
+  var grid=document.getElementById('video-grid');
+  if(videos.length===0){
+    grid.innerHTML='<div class="empty-state"><div class="icon">🎬</div><p>该分类暂无作品</p><a href="/dashboard">去创作 →</a></div>';
+    return;
+  }
+  grid.innerHTML=videos.map(function(v){
+    var cat=v.category||'创意';
+    return '<div class="video-card" onclick="location.href=\'/detail?id='+v.id+'\'"><video src="'+v.url+'" preload="metadata"></video><div class="v-info"><div class="v-name">'+esc(v.name)+'</div><div class="v-meta"><span><span style="background:rgba(99,102,241,0.12);color:var(--accent2);padding:1px 8px;border-radius:8px;font-size:11px;">'+cat+'</span> · '+v.created_at+'</span><span class="v-author">'+esc(v.owner_name)+'</span></div></div></div>';
+  }).join('');
+}
+
+function playVideo(url,name){
+  document.getElementById('video-overlay').classList.add('show');
+  document.getElementById('overlay-video').src=url;
+  document.getElementById('overlay-info').textContent=name;
+}
+
+function closeOverlay(){
+  document.getElementById('video-overlay').classList.remove('show');
+  document.getElementById('overlay-video').src='';
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>
